@@ -1,0 +1,2 @@
+﻿API_LOGIN_OK=False
+API_ERROR=Anulada la solicitud: Se excedió el tiempo de espera de la operación.
