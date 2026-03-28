@@ -277,19 +277,24 @@ async function saveClientStatus() {
 
   savingStatus.value = true
   try {
-    await store.updateClientStatus(reviewClient.value.id, reviewStatus.value)
+    // store.updateClientStatus() already patches store.items[idx] with the PATCH
+    // response from the server — it includes the freshly computed estado_comercial.
+    // We must NOT await fetchClients() here: that triggers maybeAutoReconcileMorosos()
+    // on the backend which can race against the just-saved estado and overwrite it.
+    const saved = await store.updateClientStatus(reviewClient.value.id, reviewStatus.value)
+    const updatedClient = saved?.data
 
-    // Reload from server so UI always reflects what is persisted in DB.
-    await store.fetchClients(store.pagination.current_page)
-
-    const updated = store.items.find((c) => c.id === reviewClient.value.id)
-    if (updated) {
-      reviewClient.value = updated
-      reviewStatus.value = commercialState(updated)
+    if (updatedClient) {
+      reviewClient.value = { ...reviewClient.value, ...updatedClient }
+      reviewStatus.value = commercialState(reviewClient.value)
     }
 
     alert('Estado actualizado y guardado en BD correctamente.')
     closeReviewModal()
+
+    // Background refresh (no await) — updates counts/filters without blocking
+    // and only runs AFTER the modal is already closed.
+    store.fetchClients(store.pagination.current_page)
   } catch (e) {
     alert(e?.response?.data?.message ?? 'No se pudo guardar el estado del cliente en BD.')
   } finally {
