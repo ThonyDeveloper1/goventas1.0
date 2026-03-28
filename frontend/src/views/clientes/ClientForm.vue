@@ -1,4 +1,4 @@
-<script setup>
+]633;E;head -n 140 "$FILE";d10cf179-3758-4aaf-8d9e-1bbb1100ebf5]633;C<script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClientsStore } from '@/store/clients'
@@ -138,47 +138,99 @@ function placeLeafletMarker(latlng) {
   })
 }
 
-function getCurrentLocation() {
-  if (!navigator.geolocation) {
-    geoError.value = 'El navegador no soporta geolocalización.'
-    return
-  }
-
+async function getCurrentLocation() {
   const host = window.location.hostname
   const isLocalHost = host === 'localhost' || host === '127.0.0.1'
-  if (!window.isSecureContext && !isLocalHost) {
-    geoError.value = 'Para usar ubicación en celular abre el sistema por HTTPS o localhost.'
-    return
-  }
+  const canUseBrowserGeo = window.isSecureContext || isLocalHost
 
   geoLoading.value = true
-  geoError.value   = ''
+  geoError.value = ''
 
-  const applyCoords = (coords) => {
-    form.latitud  = coords.latitude.toFixed(7)
-    form.longitud = coords.longitude.toFixed(7)
+  const applyCoords = (coords, zoom = 16) => {
+    form.latitud = Number(coords.latitude).toFixed(7)
+    form.longitud = Number(coords.longitude).toFixed(7)
     delete errors.value.latitud
     delete errors.value.longitud
     geoLoading.value = false
+
     if (leafletMap) {
       const pos = [parseFloat(form.latitud), parseFloat(form.longitud)]
       leafletMap.invalidateSize()
-      leafletMap.setView(pos, 16)
+      leafletMap.setView(pos, zoom)
       placeLeafletMarker(pos)
     }
   }
 
-  const handleGeoError = (err) => {
-    if (err.code === 1) {
-      geoError.value = 'Permiso de ubicación denegado. Actívalo en el navegador.'
+  const fetchIpCoords = async () => {
+    const controllers = []
+    const withTimeout = (url, mapResponse) => {
+      const controller = new AbortController()
+      controllers.push(controller)
+      const timer = setTimeout(() => controller.abort(), 8000)
+      return fetch(url, { signal: controller.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          clearTimeout(timer)
+          return data ? mapResponse(data) : null
+        })
+        .catch(() => {
+          clearTimeout(timer)
+          return null
+        })
+    }
+
+    let coords = await withTimeout('https://ipapi.co/json/', (data) => {
+      const lat = Number(data?.latitude)
+      const lng = Number(data?.longitude)
+      return Number.isFinite(lat) && Number.isFinite(lng)
+        ? { latitude: lat, longitude: lng }
+        : null
+    })
+
+    if (!coords) {
+      coords = await withTimeout('https://ipwho.is/', (data) => {
+        const lat = Number(data?.latitude)
+        const lng = Number(data?.longitude)
+        return Number.isFinite(lat) && Number.isFinite(lng)
+          ? { latitude: lat, longitude: lng }
+          : null
+      })
+    }
+
+    controllers.forEach((c) => c.abort())
+    return coords
+  }
+
+  if (!canUseBrowserGeo) {
+    const ipCoords = await fetchIpCoords()
+    if (ipCoords) {
+      applyCoords(ipCoords, 13)
+      return
+    }
+
+    geoLoading.value = false
+    geoError.value = 'No se pudo obtener ubicación por GPS ni por IP. Ingresa coordenadas manualmente o marca en el mapa.'
+    return
+  }
+
+  const handleGeoError = async (err) => {
+    if (err?.code === 1) {
       geoPermissionState.value = 'denied'
-    } else if (err.code === 2) {
+      geoError.value = 'Permiso de ubicación denegado. Actívalo en el navegador.'
+    } else if (err?.code === 2) {
       geoError.value = 'No se pudo determinar tu ubicación. Enciende GPS/Alta precisión e intenta de nuevo.'
-    } else if (err.code === 3) {
+    } else if (err?.code === 3) {
       geoError.value = 'Se agotó el tiempo al obtener la ubicación. Intenta otra vez.'
     } else {
       geoError.value = 'No se pudo obtener la ubicación.'
     }
+
+    const ipCoords = await fetchIpCoords()
+    if (ipCoords) {
+      applyCoords(ipCoords, 13)
+      return
+    }
+
     geoLoading.value = false
   }
 
@@ -193,8 +245,7 @@ function getCurrentLocation() {
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => applyCoords(coords),
     (err) => {
-      // On mobile, code=2 may fail with high accuracy indoors; retry once with coarse mode.
-      if (err.code === 2) {
+      if (err?.code === 2) {
         retryWithCoarseLocation()
         return
       }
@@ -203,7 +254,6 @@ function getCurrentLocation() {
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   )
 }
-
 /* ── Photo upload ────────────────────────────────────── */
 const PHOTO_SECTIONS = {
   fachada: 'fachada',
