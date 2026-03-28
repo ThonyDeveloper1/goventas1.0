@@ -170,6 +170,13 @@ class UserController extends Controller
      */
     public function destroy(Request $request, User $user): JsonResponse
     {
+        if (! $request->user()?->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solo un administrador puede eliminar o desactivar usuarios.',
+            ], 403);
+        }
+
         if ($user->id === $request->user()->id) {
             return response()->json([
                 'success' => false,

@@ -105,6 +105,11 @@ async function saveUser() {
 }
 
 async function toggleActive(user) {
+  if (!auth.isAdmin) {
+    alert('Solo un administrador puede activar o desactivar usuarios.')
+    return
+  }
+
   if (user.id === auth.user?.id) {
     alert('No puedes desactivar tu propia cuenta.')
     return
@@ -120,6 +125,11 @@ async function toggleActive(user) {
 }
 
 async function deactivateUser(user) {
+  if (!auth.isAdmin) {
+    alert('Solo un administrador puede eliminar o desactivar usuarios.')
+    return
+  }
+
   if (user.id === auth.user?.id) {
     alert('No puedes desactivar tu propia cuenta.')
     return
@@ -269,13 +279,13 @@ onMounted(() => {
               <td class="px-5 py-3.5">
                 <button
                   @click="toggleActive(user)"
-                  :disabled="user.id === auth.user?.id"
+                  :disabled="!auth.isAdmin || user.id === auth.user?.id"
                   :class="[
                     'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors',
                     user.active
                       ? 'bg-green-100 text-green-700 hover:bg-green-200'
                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
-                    user.id === auth.user?.id ? 'cursor-default' : 'cursor-pointer',
+                    !auth.isAdmin || user.id === auth.user?.id ? 'cursor-default opacity-60' : 'cursor-pointer',
                   ]"
                 >
                   <span :class="['w-1.5 h-1.5 rounded-full', user.active ? 'bg-green-500' : 'bg-gray-400']" />
@@ -296,7 +306,7 @@ onMounted(() => {
                     </svg>
                   </button>
                   <button
-                    v-if="user.id !== auth.user?.id && user.active"
+                    v-if="auth.isAdmin && user.id !== auth.user?.id && user.active"
                     @click="deactivateUser(user)"
                     class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                     title="Desactivar"
