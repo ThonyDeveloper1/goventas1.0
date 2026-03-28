@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { useNotificationsStore } from '@/store/notifications'
 import api from '@/services/api'
 
 defineEmits(['toggle-sidebar'])
+const props = defineProps({ sidebarOpen: { type: Boolean, default: false } })
 
 const router        = useRouter()
 const auth          = useAuthStore()
@@ -19,6 +20,14 @@ const loadingSales  = ref(false)
 
 let pollInterval = null
 let salesPollInterval = null
+
+// Close dropdowns when mobile sidebar opens to avoid overlap
+watch(() => props.sidebarOpen, (open) => {
+  if (open) {
+    showNotifs.value = false
+    showSales.value  = false
+  }
+})
 
 onMounted(() => {
   notifications.fetchUnreadCount()
@@ -147,13 +156,13 @@ async function handleLogout() {
     <div class="flex-1" />
 
     <!-- Right: notifications + role badge + user + logout -->
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-1.5 sm:gap-3">
 
       <!-- Ventas icon (admin only) -->
       <div v-if="auth.isAdmin" class="relative">
         <button
           @click="toggleSalesDropdown"
-          class="relative p-2 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+          class="relative p-1.5 sm:p-2 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
           title="Ventas del mes"
         >
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -170,12 +179,12 @@ async function handleLogout() {
         <Transition name="fade">
           <div
             v-if="showSales"
-            class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-40 overflow-hidden"
+            class="fixed top-14 right-2 lg:absolute lg:top-full lg:right-0 lg:mt-2 w-[calc(100vw-1rem)] max-w-[20rem] sm:w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden"
           >
             <div class="px-4 py-3 border-b border-gray-100">
               <h3 class="text-sm font-bold text-gray-800">Ventas del mes</h3>
             </div>
-            <div class="max-h-72 overflow-y-auto">
+            <div class="max-h-[70vh] sm:max-h-72 overflow-y-auto">
               <div v-if="loadingSales" class="px-4 py-6 text-center text-gray-400 text-sm">
                 Cargando ventas...
               </div>
@@ -207,7 +216,7 @@ async function handleLogout() {
       <div class="relative">
         <button
           @click="showNotifs = !showNotifs; if (showNotifs) notifications.fetchNotifications()"
-          class="relative p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          class="relative p-1.5 sm:p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           title="Notificaciones"
         >
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,19 +234,19 @@ async function handleLogout() {
         <Transition name="fade">
           <div
             v-if="showNotifs"
-            class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-40 overflow-hidden"
+            class="fixed top-14 right-2 lg:absolute lg:top-full lg:right-0 lg:mt-2 w-[calc(100vw-1rem)] max-w-[20rem] sm:w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden"
           >
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <h3 class="text-sm font-bold text-gray-800">Notificaciones</h3>
               <button
                 v-if="notifications.unreadCount > 0"
                 @click="notifications.markAllRead()"
-                class="text-xs text-primary hover:underline"
+                class="text-[11px] sm:text-xs text-primary hover:underline whitespace-nowrap"
               >
                 Marcar todo leído
               </button>
             </div>
-            <div class="max-h-72 overflow-y-auto">
+            <div class="max-h-[70vh] sm:max-h-72 overflow-y-auto">
               <div v-if="!notifications.items.length" class="px-4 py-8 text-center text-gray-400 text-sm">
                 Sin notificaciones
               </div>
@@ -250,8 +259,8 @@ async function handleLogout() {
                   !n.read_at ? 'bg-primary/5' : '',
                 ]"
               >
-                <p class="text-sm font-medium text-gray-800">{{ n.titulo }}</p>
-                <p class="text-xs text-gray-500 mt-0.5">{{ n.mensaje }}</p>
+                <p class="text-sm font-medium text-gray-800 break-words">{{ n.titulo }}</p>
+                <p class="text-xs text-gray-500 mt-0.5 break-words">{{ n.mensaje }}</p>
               </button>
             </div>
           </div>

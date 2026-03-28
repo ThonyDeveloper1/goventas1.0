@@ -10,6 +10,7 @@ const form = reactive({ login: '', password: '' })
 const loading      = ref(false)
 const errorMsg     = ref('')
 const showPassword = ref(false)
+const rememberMe   = ref(false)
 
 function normalizeLoginInput(raw) {
   const value = String(raw ?? '').replace(/\s+/g, '')
@@ -27,7 +28,7 @@ async function handleLogin() {
   loading.value  = true
   errorMsg.value = ''
   try {
-    await auth.login(form.login, form.password)
+    await auth.login(form.login, form.password, rememberMe.value)
     router.push('/dashboard')
   } catch (err) {
     errorMsg.value =
@@ -133,6 +134,16 @@ async function handleLogin() {
           </div>
 
           <!-- Submit -->
+                    <!-- Mantener sesión -->
+                    <label class="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+                      <input
+                        v-model="rememberMe"
+                        type="checkbox"
+                        class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-primary accent-primary cursor-pointer"
+                      />
+                      <span class="text-sm text-gray-400">Mantener sesión iniciada</span>
+                    </label>
+
           <button
             type="submit"
             :disabled="loading || !form.login || !form.password"

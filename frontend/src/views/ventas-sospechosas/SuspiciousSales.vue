@@ -164,22 +164,22 @@ function scoreBarColor(score) {
         <div class="card mb-5">
           <div class="flex flex-wrap items-end gap-3">
             <!-- Month -->
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 w-full sm:w-auto">
               <label class="text-xs font-semibold text-gray-500">Mes</label>
               <input
                 :value="store.filters.month"
                 type="month"
-                class="input"
+                class="input w-full sm:w-auto"
                 :disabled="store.filters.all_months"
                 @change="store.setFilter('month', $event.target.value); onMonthChange()"
               />
             </div>
             <!-- Vendor (admin only) -->
-            <div v-if="auth.isAdmin" class="flex flex-col gap-1">
+            <div v-if="auth.isAdmin" class="flex flex-col gap-1 w-full sm:w-auto">
               <label class="text-xs font-semibold text-gray-500">Vendedora</label>
               <select
                 :value="store.filters.user_id"
-                class="input"
+                class="input w-full sm:w-auto"
                 @change="onVendorChange($event.target.value)"
               >
                 <option value="">Todas las vendedoras</option>
@@ -189,7 +189,7 @@ function scoreBarColor(score) {
             <!-- All months toggle -->
             <button
               type="button"
-              class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors self-end"
+              class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors w-full sm:w-auto"
               :class="store.filters.all_months ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-700 hover:border-primary/50'"
               @click="toggleAllMonths"
             >
@@ -220,28 +220,28 @@ function scoreBarColor(score) {
     </Transition>
 
     <!-- ── Stats cards ────────────────────────────────────── -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-      <button @click="filterByStatus('')" :class="['card text-center py-4 transition-all', !store.filters.status ? 'ring-2 ring-primary/30' : '']">
+    <div class="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <button @click="filterByStatus('')" :class="['card text-center py-3 sm:py-4 transition-all', !store.filters.status ? 'ring-2 ring-primary/30' : '']">
         <p class="text-2xl font-bold text-gray-800">{{ store.stats.total }}</p>
         <p class="text-xs text-gray-500 mt-0.5">Total</p>
       </button>
-      <button @click="filterByStatus('pendiente')" :class="['card text-center py-4 transition-all', store.filters.status === 'pendiente' ? 'ring-2 ring-amber-300' : '']">
+      <button @click="filterByStatus('pendiente')" :class="['card text-center py-3 sm:py-4 transition-all', store.filters.status === 'pendiente' ? 'ring-2 ring-amber-300' : '']">
         <p class="text-2xl font-bold text-amber-600">{{ store.stats.pendientes }}</p>
         <p class="text-xs text-gray-500 mt-0.5">Pendientes</p>
       </button>
-      <button @click="filterByLevel('alto')" :class="['card text-center py-4 transition-all', store.filters.risk_level === 'alto' ? 'ring-2 ring-red-300' : '']">
+      <button @click="filterByLevel('alto')" :class="['card text-center py-3 sm:py-4 transition-all', store.filters.risk_level === 'alto' ? 'ring-2 ring-red-300' : '']">
         <p class="text-2xl font-bold text-red-600">{{ store.stats.alto }}</p>
         <p class="text-xs text-gray-500 mt-0.5">Riesgo Alto</p>
       </button>
-      <button @click="filterByLevel('medio')" :class="['card text-center py-4 transition-all', store.filters.risk_level === 'medio' ? 'ring-2 ring-yellow-300' : '']">
+      <button @click="filterByLevel('medio')" :class="['card text-center py-3 sm:py-4 transition-all', store.filters.risk_level === 'medio' ? 'ring-2 ring-yellow-300' : '']">
         <p class="text-2xl font-bold text-yellow-600">{{ store.stats.medio }}</p>
         <p class="text-xs text-gray-500 mt-0.5">Riesgo Medio</p>
       </button>
-      <button @click="filterByStatus('aprobado')" :class="['card text-center py-4 transition-all', store.filters.status === 'aprobado' ? 'ring-2 ring-green-300' : '']">
+      <button @click="filterByStatus('aprobado')" :class="['card text-center py-3 sm:py-4 transition-all', store.filters.status === 'aprobado' ? 'ring-2 ring-green-300' : '']">
         <p class="text-2xl font-bold text-green-600">{{ store.stats.aprobados }}</p>
         <p class="text-xs text-gray-500 mt-0.5">Aprobados</p>
       </button>
-      <button @click="filterByStatus('rechazado')" :class="['card text-center py-4 transition-all', store.filters.status === 'rechazado' ? 'ring-2 ring-red-300' : '']">
+      <button @click="filterByStatus('rechazado')" :class="['card text-center py-3 sm:py-4 transition-all', store.filters.status === 'rechazado' ? 'ring-2 ring-red-300' : '']">
         <p class="text-2xl font-bold text-gray-600">{{ store.stats.rechazados }}</p>
         <p class="text-xs text-gray-500 mt-0.5">Rechazados</p>
       </button>
@@ -284,10 +284,10 @@ function scoreBarColor(score) {
       <div
         v-for="sale in store.sales"
         :key="sale.id"
-        :class="['card transition-all hover:shadow-md', sale.risk_level === 'alto' ? 'border-l-4 border-l-red-400' : sale.risk_level === 'medio' ? 'border-l-4 border-l-yellow-400' : '']"
+        :class="['card p-3 sm:p-5 transition-all hover:shadow-md', sale.risk_level === 'alto' ? 'border-l-4 border-l-red-400' : sale.risk_level === 'medio' ? 'border-l-4 border-l-yellow-400' : '']"
       >
         <!-- Main row -->
-        <div class="flex items-center gap-3 sm:gap-4 cursor-pointer" @click="toggleExpand(sale.id)">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 cursor-pointer" @click="toggleExpand(sale.id)">
           <!-- Risk icon -->
           <div :class="['w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ring-1', rk(sale.risk_level).bg, sale.risk_level === 'alto' ? 'ring-red-200' : sale.risk_level === 'medio' ? 'ring-yellow-200' : 'ring-green-200']">
             <svg v-if="sale.risk_level === 'alto'" class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -329,7 +329,7 @@ function scoreBarColor(score) {
           </div>
 
           <!-- Action buttons -->
-          <div class="flex gap-1.5 flex-shrink-0">
+          <div class="flex gap-1.5 flex-shrink-0 w-full sm:w-auto justify-end">
             <!-- Pending: approve + reject -->
             <template v-if="sale.status === 'pendiente'">
               <button
@@ -383,7 +383,7 @@ function scoreBarColor(score) {
           </div>
 
           <!-- Expand / collapse chevron -->
-          <div class="flex-shrink-0 text-gray-400">
+          <div class="self-end sm:self-auto flex-shrink-0 text-gray-400">
             <svg :class="['w-5 h-5 transition-transform', expandedId === sale.id && 'rotate-180']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
@@ -405,13 +405,13 @@ function scoreBarColor(score) {
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-gray-700">{{ reason.label }}</p>
-                  <p class="text-xs text-gray-400 mt-0.5 font-mono">{{ reason.rule }}</p>
+                  <p class="text-xs text-gray-400 mt-0.5 font-mono break-all">{{ reason.rule }}</p>
                 </div>
               </div>
             </div>
 
             <!-- Client details -->
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm" v-if="sale.client">
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm" v-if="sale.client">
               <div class="bg-gray-50 rounded-xl p-3">
                 <p class="text-gray-500 text-xs mb-0.5">Teléfono</p>
                 <p class="text-gray-800 font-medium">{{ sale.client.telefono_1 || '—' }}</p>
@@ -420,9 +420,9 @@ function scoreBarColor(score) {
                 <p class="text-gray-500 text-xs mb-0.5">Estado cliente</p>
                 <p class="text-gray-800 font-medium capitalize">{{ sale.client.estado }}</p>
               </div>
-              <div class="bg-gray-50 rounded-xl p-3 col-span-2">
+              <div class="bg-gray-50 rounded-xl p-3 sm:col-span-2">
                 <p class="text-gray-500 text-xs mb-0.5">Dirección</p>
-                <p class="text-gray-800 font-medium">{{ sale.client.direccion || '—' }}, {{ sale.client.distrito || '' }}</p>
+                <p class="text-gray-800 font-medium break-words">{{ sale.client.direccion || '—' }}, {{ sale.client.distrito || '' }}</p>
               </div>
             </div>
 
@@ -439,20 +439,22 @@ function scoreBarColor(score) {
     </div>
 
     <!-- ── Pagination ─────────────────────────────────────── -->
-    <div v-if="store.pagination.last_page > 1" class="flex items-center justify-center gap-2 mt-6">
-      <button
-        v-for="p in store.pagination.last_page"
-        :key="p"
-        @click="goToPage(p)"
-        :class="[
-          'w-9 h-9 rounded-lg text-sm font-medium transition-colors',
-          p === store.pagination.current_page
-            ? 'bg-primary text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-        ]"
-      >
-        {{ p }}
-      </button>
+    <div v-if="store.pagination.last_page > 1" class="mt-6 overflow-x-auto">
+      <div class="flex items-center justify-start sm:justify-center gap-2 min-w-max px-1">
+        <button
+          v-for="p in store.pagination.last_page"
+          :key="p"
+          @click="goToPage(p)"
+          :class="[
+            'w-9 h-9 rounded-lg text-sm font-medium transition-colors',
+            p === store.pagination.current_page
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+          ]"
+        >
+          {{ p }}
+        </button>
+      </div>
     </div>
   </div>
 </template>

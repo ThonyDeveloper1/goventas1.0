@@ -425,9 +425,34 @@ function reviewPhotosByType(client, type) {
 }
 
 async function copyToClipboard(text) {
-  if (!text) return
+  if (text === null || text === undefined) return
+
+  const value = String(text)
+  if (!value.trim()) return
+
   try {
-    await navigator.clipboard.writeText(String(text))
+    // navigator.clipboard fails on many HTTP/IP contexts; keep a fallback path.
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(value)
+      return
+    }
+
+    const textArea = document.createElement('textarea')
+    textArea.value = value
+    textArea.setAttribute('readonly', '')
+    textArea.style.position = 'fixed'
+    textArea.style.opacity = '0'
+    textArea.style.pointerEvents = 'none'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    const copied = document.execCommand('copy')
+    document.body.removeChild(textArea)
+
+    if (!copied) {
+      throw new Error('Clipboard fallback failed')
+    }
   } catch (e) {
     console.error('Error copying to clipboard:', e)
   }

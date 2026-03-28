@@ -23,7 +23,7 @@ const sidebarOpen = ref(false)
 
     <!-- Main -->
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
-      <Navbar @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+      <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
 
       <main class="flex-1 overflow-y-auto p-4 md:p-6">
         <RouterView v-slot="{ Component }">

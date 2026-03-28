@@ -5,7 +5,7 @@ import api from '@/services/api'
 export const useAuthStore = defineStore('auth', () => {
   /* ── State ─────────────────────────────────────── */
   const user  = ref(null)
-  const token = ref(localStorage.getItem('token') ?? null)
+  const token = ref(localStorage.getItem('token') ?? sessionStorage.getItem('token') ?? null)
 
   /* ── Getters ────────────────────────────────────── */
   const isAuthenticated = computed(() => !!token.value && !!user.value)
@@ -15,11 +15,17 @@ export const useAuthStore = defineStore('auth', () => {
   const isSupervisor    = computed(() => user.value?.role === 'supervisor')
 
   /* ── Actions ────────────────────────────────────── */
-  async function login(login, password) {
+  async function login(login, password, remember = true) {
     const { data } = await api.post('/login', { login, password })
     token.value = data.token
     user.value  = data.user
-    localStorage.setItem('token', data.token)
+    if (remember) {
+      localStorage.setItem('token', data.token)
+      sessionStorage.removeItem('token')
+    } else {
+      sessionStorage.setItem('token', data.token)
+      localStorage.removeItem('token')
+    }
     return data.user
   }
 
@@ -54,6 +60,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     user.value  = null
     localStorage.removeItem('token')
+    sessionStorage.removeItem('token')
   }
 
   return {
