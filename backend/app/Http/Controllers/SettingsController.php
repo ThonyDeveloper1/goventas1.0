@@ -73,7 +73,7 @@ class SettingsController extends Controller
     public function testReniec(): JsonResponse
     {
         $token = Setting::get('reniec_token', '') ?: config('services.reniec.token', '');
-        $url = config('services.reniec.url', 'https://apiperu.dev/api');
+        $url = rtrim((string) (config('services.reniec.url') ?: 'https://apiperu.dev/api'), '/');
 
         if (! $token) {
             return response()->json([
@@ -83,49 +83,50 @@ class SettingsController extends Controller
         }
 
         try {
-            $http = Http::withToken($token)
-                ->accept('application/json')
+            $baseHttp = Http::accept('application/json')
                 ->timeout(8);
 
             if (app()->environment('local')) {
-                $http = $http->withoutVerifying();
+                $baseHttp = $baseHttp->withoutVerifying();
             }
 
-            $response = $http->post("{$url}/dni", ['dni' => '12345678']);
+            $attempts = [
+                $baseHttp->withToken($token)->post("{$url}/dni", ['dni' => '12345678']),
+                $baseHttp->withQueryParameters(['token' => $token])->post("{$url}/dni", ['dni' => '12345678']),
+            ];
 
-            if ($response->status() === 401) {
-                Log::warning('SettingsController: test RENIEC token invalido.');
+            foreach ($attempts as $response) {
+                if ($response->status() === 401) {
+                    continue;
+                }
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Token invalido o sin permisos.',
-                ]);
+                if ($response->successful()) {
+                    Log::info('SettingsController: test RENIEC exitoso.');
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Conexion exitosa con apiperu.dev.',
+                    ]);
+                }
+
+                $message = (string) ($response->json('message') ?? '');
+                if ($message !== '' && str_contains(strtolower($message), 'no se encontraron resultados')) {
+                    Log::info('SettingsController: test RENIEC sin resultados para DNI de prueba, pero conexion/token validos.', [
+                        'status' => $response->status(),
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Conexion exitosa con apiperu.dev. El DNI de prueba no tuvo resultados.',
+                    ]);
+                }
             }
 
-            if ($response->successful()) {
-                Log::info('SettingsController: test RENIEC exitoso.');
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Conexion exitosa con apiperu.dev.',
-                ]);
-            }
-
-            $message = (string) ($response->json('message') ?? '');
-            if ($message !== '' && str_contains(strtolower($message), 'no se encontraron resultados')) {
-                Log::info('SettingsController: test RENIEC sin resultados para DNI de prueba, pero conexion/token validos.', [
-                    'status' => $response->status(),
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Conexion exitosa con apiperu.dev. El DNI de prueba no tuvo resultados.',
-                ]);
-            }
+            Log::warning('SettingsController: test RENIEC token invalido.');
 
             return response()->json([
                 'success' => false,
-                'message' => "Respuesta inesperada (HTTP {$response->status()}).",
+                'message' => 'Token invalido o sin permisos.',
             ]);
         } catch (\Throwable $e) {
             Log::error('SettingsController: testReniec exception.', [

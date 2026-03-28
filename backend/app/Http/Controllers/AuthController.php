@@ -39,9 +39,7 @@ class AuthController extends Controller
                 ]);
             }
 
-            $user = User::where('dni', $login)
-                ->where('active', true)
-                ->first();
+            $user = User::where('dni', $login)->first();
         } else {
             $login = mb_strtolower($login);
 
@@ -58,9 +56,7 @@ class AuthController extends Controller
                 ]);
             }
 
-            $user = User::whereRaw('LOWER(email) = ?', [$login])
-                ->where('active', true)
-                ->first();
+            $user = User::whereRaw('LOWER(email) = ?', [$login])->first();
         }
 
         if (! $user) {

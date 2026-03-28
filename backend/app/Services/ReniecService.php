@@ -13,61 +13,101 @@ class ReniecService
     public function getPersonByDni(string $dni): array
     {
         $token = Setting::get('reniec_token', '') ?: config('services.reniec.token', '');
-        $url = config('services.reniec.url', 'https://apiperu.dev/api');
-        $enabled = Setting::get('reniec_enabled', '0') === '1';
+        $url = rtrim((string) (config('services.reniec.url') ?: 'https://apiperu.dev/api'), '/');
+        $cacheKey = "reniec:{$dni}";
 
-        if ($token && $enabled) {
-            return Cache::remember("reniec:{$dni}", 3600, function () use ($token, $url, $dni) {
-                // If RENIEC is enabled, never fabricate identity data.
-                // Return empty payload when provider fails or has no match.
-                return $this->fetchFromApi($token, $url, $dni) ?? [];
-            });
+        // Si existe token, solo devolver resultados reales de la API.
+        if ($token) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached) && ! empty($cached['nombres'])) {
+                return $cached;
+            }
+
+            $result = $this->fetchFromApi($token, $url, $dni);
+            if ($result) {
+                Cache::put($cacheKey, $result, 3600);
+                return $result;
+            }
+
+            Log::warning('ReniecService: API RENIEC no devolvio datos reales.', ['dni' => $dni]);
+            return [];
         }
 
+        // Si no hay token, usa datos simulados
         return $this->mock($dni);
     }
 
     private function fetchFromApi(string $token, string $url, string $dni): ?array
     {
         try {
-            $http = Http::withToken($token)
-                ->accept('application/json')
+            $baseHttp = Http::accept('application/json')
                 ->timeout(8)
                 ->retry(2, 500, fn (\Throwable $e) => $e instanceof ConnectionException);
 
             if (app()->environment('local')) {
-                $http = $http->withoutVerifying();
+                $baseHttp = $baseHttp->withoutVerifying();
             }
 
-            $response = $http->post("{$url}/dni", ['dni' => $dni]);
-
-            if ($response->status() === 401) {
-                Log::warning('ReniecService: token invalido, verifica RENIEC_API_TOKEN en .env.', [
-                    'dni' => $dni,
-                ]);
-
-                return null;
-            }
-
-            if ($response->successful() && $response->json('success')) {
-                $data = $response->json('data') ?? [];
-
-                Log::info('ReniecService: DNI consultado.', [
-                    'dni' => $dni,
-                ]);
-
-                return [
-                    'nombres' => $data['nombres'] ?? '',
-                    'apellidos' => trim(
-                        ($data['apellido_paterno'] ?? $data['apellidoPaterno'] ?? '') . ' ' .
-                        ($data['apellido_materno'] ?? $data['apellidoMaterno'] ?? '')
-                    ),
-                ];
-            }
-
-            Log::warning('ReniecService: respuesta inesperada de apiperu.dev.', [
+            Log::info('ReniecService: Consultando DNI en proveedor RENIEC', [
                 'dni' => $dni,
-                'status' => $response->status(),
+                'url' => "{$url}/dni",
+            ]);
+
+            // Compatibilidad: algunos proveedores aceptan Bearer y otros query token.
+            $attempts = [
+                [
+                    'auth' => 'bearer',
+                    'response' => $baseHttp
+                        ->withToken($token)
+                        ->post("{$url}/dni", ['dni' => $dni]),
+                ],
+                [
+                    'auth' => 'query',
+                    'response' => $baseHttp
+                        ->withQueryParameters(['token' => $token])
+                        ->post("{$url}/dni", ['dni' => $dni]),
+                ],
+            ];
+
+            foreach ($attempts as $attempt) {
+                $response = $attempt['response'];
+
+                Log::info('ReniecService: Respuesta recibida', [
+                    'dni' => $dni,
+                    'auth' => $attempt['auth'],
+                    'status' => $response->status(),
+                    'body' => $response->json(),
+                ]);
+
+                if ($response->status() === 401) {
+                    continue;
+                }
+
+                if ($response->successful() && $response->json('success')) {
+                    $data = $response->json('data') ?? [];
+
+                    Log::info('ReniecService: DNI consultado exitosamente.', [
+                        'dni' => $dni,
+                        'nombres' => $data['nombres'] ?? 'N/A',
+                    ]);
+
+                    return [
+                        'nombres' => $data['nombres'] ?? '',
+                        'apellidos' => trim(
+                            ($data['apellido_paterno'] ?? $data['apellidoPaterno'] ?? '') . ' ' .
+                            ($data['apellido_materno'] ?? $data['apellidoMaterno'] ?? '')
+                        ),
+                    ];
+                }
+
+                $message = strtolower((string) ($response->json('message') ?? ''));
+                if ($message !== '' && str_contains($message, 'no se encontraron resultados')) {
+                    return [];
+                }
+            }
+
+            Log::warning('ReniecService: token invalido o respuesta no compatible.', [
+                'dni' => $dni,
             ]);
 
             return null;
@@ -75,6 +115,7 @@ class ReniecService
             Log::error('ReniecService: excepcion al consultar DNI.', [
                 'dni' => $dni,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return null;
