@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Daily CRON (2:00 AM America/Lima):
- * Find clients past fecha_vencimiento with estado=activo,
- * suspend PPPoE on MikroTik, mark estado=moroso.
+ * Find clients past fecha_vencimiento with service_status=activo,
+ * suspend PPPoE on MikroTik, mark service_status=suspendido.
  */
 class CorteCronJob implements ShouldQueue
 {
@@ -29,8 +29,8 @@ class CorteCronJob implements ShouldQueue
     {
         $today = Carbon::now('America/Lima')->startOfDay();
 
-        // Find clients: past due, still activo, with PPPoE configured
-        $clients = Client::where('estado', 'activo')
+        // Find clients: past due, still active in service layer, with PPPoE configured
+        $clients = Client::where('service_status', 'activo')
             ->whereNotNull('fecha_vencimiento')
             ->where('fecha_vencimiento', '<', $today)
             ->whereNotNull('mikrotik_user')
@@ -52,7 +52,6 @@ class CorteCronJob implements ShouldQueue
 
                 // Update DB
                 $client->updateQuietly([
-                    'estado'         => 'moroso',
                     'service_status' => 'suspendido',
                 ]);
 

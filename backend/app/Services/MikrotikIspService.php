@@ -243,8 +243,11 @@ class MikrotikIspService
      * Sincroniza morosos + IPs de secrets del router con la BD.
      *
      * 1. PPP secrets → match por nombre → guarda ip_address de TODOS
-     * 2. CORTE MOROSO → match por nombre → marca estado='moroso'
-     * 3. Clientes que ya no están en CORTE MOROSO → estado='activo'
+     * 2. CORTE MOROSO → match por nombre → marca service_status='suspendido'
+     * 3. Clientes que ya no están en CORTE MOROSO → service_status='activo'
+     *
+     * Nota: NO modifica el campo comercial `estado` para respetar cambios
+     * manuales hechos por el administrador en revisión de cliente.
      */
     public function syncMorososToDb(int $routerId): array
     {
@@ -299,7 +302,7 @@ class MikrotikIspService
             }
         }
 
-        // ── 2. CORTE MOROSO → mark morosos ───────────────────
+        // ── 2. CORTE MOROSO → mark as suspended in service_status ─────────
         $morosos = $this->getMoresoFromRouter($routerId);
         $morosoClientIds = [];
         $morosUpdated = 0;
@@ -318,8 +321,8 @@ class MikrotikIspService
             }
 
             $changes = [];
-            if ($client->estado !== 'moroso') {
-                $changes['estado'] = 'moroso';
+            if ($client->service_status !== 'suspendido') {
+                $changes['service_status'] = 'suspendido';
             }
             if (! empty($entry['address']) && $client->ip_address !== $entry['address']) {
                 $changes['ip_address'] = $entry['address'];
@@ -334,7 +337,7 @@ class MikrotikIspService
             }
         }
 
-        // ── 3. Restore non-morosos → estado 'activo' ────────
+        // ── 3. Restore non-morosos → service_status 'activo' ──────────────
         // Clients linked to this router (by router_id or matched in this sync)
         $allLinkedIds = array_unique(array_merge(
             $matchedClientIds,
@@ -346,8 +349,8 @@ class MikrotikIspService
         $restored = 0;
         if (! empty($restorableIds)) {
             $restored = Client::whereIn('id', $restorableIds)
-                ->where('estado', 'moroso')
-                ->update(['estado' => 'activo']);
+                ->where('service_status', 'suspendido')
+                ->update(['service_status' => 'activo']);
         }
 
         return [
@@ -356,7 +359,7 @@ class MikrotikIspService
             'morosos'      => count($morosoClientIds),
             'morosUpdated' => $morosUpdated,
             'restored'     => $restored,
-            'message'      => "Sync: {$ipsUpdated} IPs actualizadas, {$morosUpdated} marcados moroso, {$restored} restaurados.",
+            'message'      => "Sync: {$ipsUpdated} IPs actualizadas, {$morosUpdated} suspendidos en servicio, {$restored} restaurados.",
         ];
     }
 
@@ -868,22 +871,22 @@ class MikrotikIspService
                 }
             }
 
-            $newEstado = $isMoroso ? 'moroso' : 'activo';
-            if ($client->estado !== $newEstado) {
-                $changes['estado'] = $newEstado;
+            $newServiceStatus = $isMoroso ? 'suspendido' : 'activo';
+            if ($client->service_status !== $newServiceStatus) {
+                $changes['service_status'] = $newServiceStatus;
             }
 
             if (!empty($changes)) {
                 $client->updateQuietly($changes);
             }
 
-            Log::info("[MikrotikISP:syncSingleClient] {$client->nombre_completo} → IP=" . ($changes['ip_address'] ?? $client->ip_address ?? 'N/A') . " estado={$newEstado}");
+            Log::info("[MikrotikISP:syncSingleClient] {$client->nombre_completo} → IP=" . ($changes['ip_address'] ?? $client->ip_address ?? 'N/A') . " service_status={$newServiceStatus}");
 
             return [
                 'matched'  => true,
                 'router'   => $router->name,
                 'ip'       => $changes['ip_address'] ?? $client->ip_address,
-                'estado'   => $newEstado,
+                'service_status' => $newServiceStatus,
                 'changes'  => $changes,
             ];
         } finally {
@@ -1422,7 +1425,7 @@ class MikrotikIspService
 
     public function countMoresosByVendedora(): array
     {
-        return Client::where('estado', 'moroso')
+        return Client::where('service_status', 'suspendido')
             ->selectRaw('user_id, count(*) as total')
             ->groupBy('user_id')
             ->with('vendedora:id,name')

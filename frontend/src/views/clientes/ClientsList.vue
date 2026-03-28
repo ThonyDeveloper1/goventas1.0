@@ -196,7 +196,7 @@ function commercialState(client) {
   if (client.estado === 'suspendido') return 'suspendido'
   if (client.estado === 'pre_registro') return 'pre_registro'
   if (client.estado === 'en_proceso') return 'en_proceso'
-  if (client.estado === 'finalizada' || client.estado === 'activo' || client.service_status === 'activo') return 'finalizada'
+  if (client.estado === 'finalizada' || client.estado === 'activo') return 'finalizada'
   return 'pre_registro'
 }
 

@@ -50,8 +50,7 @@ class ClientController extends Controller
         if ($estado = $request->input('estado')) {
             if ($estado === 'finalizada') {
                 $query->where(function ($q) {
-                    $q->whereIn('estado', ['activo', 'finalizada'])
-                        ->orWhere('service_status', 'activo');
+                    $q->whereIn('estado', ['activo', 'finalizada']);
                 });
             } elseif ($estado === 'pre_registro') {
                 $query->where(function ($q) {
@@ -625,7 +624,7 @@ class ClientController extends Controller
             return 'en_proceso';
         }
 
-        if ($client->estado === 'finalizada' || $client->estado === 'activo' || $client->service_status === 'activo') {
+        if ($client->estado === 'finalizada' || $client->estado === 'activo') {
             return 'finalizada';
         }
 

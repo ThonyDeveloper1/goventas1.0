@@ -32,8 +32,9 @@ class PagosService
                 'user_id'       => $registradoPorId,
             ]);
 
-            // Auto-reactivation: if client was moroso or suspendido
-            if (in_array($client->estado, ['moroso', 'suspendido'])) {
+            // Auto-reactivation on service layer without overriding manual estado.
+            if (in_array($client->service_status, ['suspendido', 'cortado'], true)
+                || in_array($client->estado, ['moroso', 'suspendido'], true)) {
                 $this->reactivarCliente($client);
             }
 
@@ -50,7 +51,7 @@ class PagosService
     /**
      * Reactivar un cliente moroso/suspendido tras pago:
      * 1. Activar PPPoE en MikroTik
-     * 2. Cambiar estado a activo en BD
+        * 2. Cambiar service_status a activo en BD
      */
     private function reactivarCliente(Client $client): void
     {
@@ -64,9 +65,8 @@ class PagosService
             }
         }
 
-        // Update DB estado
+        // Update only service layer status; keep manual commercial estado untouched.
         $client->updateQuietly([
-            'estado'         => 'activo',
             'service_status' => 'activo',
         ]);
 

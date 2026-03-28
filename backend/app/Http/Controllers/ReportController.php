@@ -16,8 +16,8 @@ class ReportController extends Controller
         WHEN estado = 'baja' THEN 'baja'
         WHEN estado = 'suspendido' THEN 'suspendido'
         WHEN estado = 'pre_registro' THEN 'pre_registro'
+        WHEN estado = 'en_proceso' THEN 'en_proceso'
         WHEN estado = 'finalizada' THEN 'finalizada'
-        WHEN service_status = 'activo' THEN 'finalizada'
         WHEN estado = 'activo' THEN 'finalizada'
         ELSE 'pre_registro'
     END";
@@ -108,8 +108,7 @@ class ReportController extends Controller
                         $w->where('estado', 'pre_registro')->orWhereNull('estado');
                     }),
                     'clients as finalizadas_count'  => fn ($q) => $q->where(function ($w) {
-                        $w->whereIn('estado', ['activo', 'finalizada'])
-                            ->orWhere('service_status', 'activo');
+                        $w->whereIn('estado', ['activo', 'finalizada']);
                     }),
                     'clients as suspendidos_count'  => fn ($q) => $q->where('estado', 'suspendido'),
                     'clients as bajas_count'        => fn ($q) => $q->where('estado', 'baja'),
@@ -157,8 +156,7 @@ class ReportController extends Controller
         if ($estado = $request->input('estado')) {
             if ($estado === 'finalizada') {
                 $query->where(function ($q) {
-                    $q->whereIn('estado', ['activo', 'finalizada'])
-                        ->orWhere('service_status', 'activo');
+                    $q->whereIn('estado', ['activo', 'finalizada']);
                 });
             } elseif ($estado === 'pre_registro') {
                 $query->where(function ($q) {
@@ -291,7 +289,11 @@ class ReportController extends Controller
             return 'pre_registro';
         }
 
-        if ($client->estado === 'finalizada' || $client->estado === 'activo' || $client->service_status === 'activo') {
+        if ($client->estado === 'en_proceso') {
+            return 'en_proceso';
+        }
+
+        if ($client->estado === 'finalizada' || $client->estado === 'activo') {
             return 'finalizada';
         }
 
