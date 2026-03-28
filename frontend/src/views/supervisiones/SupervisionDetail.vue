@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSupervisionsStore } from '@/store/supervisions'
 import { useAuthStore } from '@/store/auth'
+import { resolvePhotoUrl } from '@/utils/photoUrl'
 
 const router = useRouter()
 const route  = useRoute()
@@ -254,10 +255,10 @@ const lightboxUrl = ref(null)
           <button
             v-for="photo in sup.installation.client.photos"
             :key="photo.id"
-            @click="lightboxUrl = photo.url"
+            @click="lightboxUrl = resolvePhotoUrl(photo)"
             class="aspect-square rounded-xl overflow-hidden border border-gray-100 hover:border-primary/40 transition-colors"
           >
-            <img :src="photo.url" :alt="`Foto ${photo.id}`" class="w-full h-full object-cover"/>
+            <img :src="resolvePhotoUrl(photo)" :alt="`Foto ${photo.id}`" class="w-full h-full object-cover"/>
           </button>
         </div>
       </div>
@@ -292,8 +293,8 @@ const lightboxUrl = ref(null)
         <!-- Existing photos -->
         <div v-if="sup.photos?.length" class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3">
           <div v-for="photo in sup.photos" :key="photo.id" class="relative group aspect-square">
-            <button @click="lightboxUrl = photo.url" class="w-full h-full rounded-xl overflow-hidden border border-gray-100 hover:border-primary/40 transition-colors">
-              <img :src="photo.url" :alt="`Evidencia ${photo.id}`" class="w-full h-full object-cover"/>
+            <button @click="lightboxUrl = resolvePhotoUrl(photo)" class="w-full h-full rounded-xl overflow-hidden border border-gray-100 hover:border-primary/40 transition-colors">
+              <img :src="resolvePhotoUrl(photo)" :alt="`Evidencia ${photo.id}`" class="w-full h-full object-cover"/>
             </button>
             <button
               v-if="canUpload && sup.estado !== 'completado'"

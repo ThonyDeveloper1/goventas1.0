@@ -5,6 +5,7 @@ import { useClientsStore } from '@/store/clients'
 import { useAuthStore } from '@/store/auth'
 import { useInstallationsStore } from '@/store/installations'
 import { usePlansStore } from '@/store/plans'
+import { resolvePhotoUrl } from '@/utils/photoUrl'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -479,18 +480,29 @@ async function onFileChange(section, e) {
 }
 
 function removeNewPhoto(section, index) {
+  if (totalPhotosCount() <= 1) {
+    photoError.value = 'Debes conservar al menos una foto de evidencia.'
+    return
+  }
+
   URL.revokeObjectURL(preview[section][index])
   fotosNuevas[section] = fotosNuevas[section].filter((_, i) => i !== index)
   preview[section] = preview[section].filter((_, i) => i !== index)
 }
 
 async function removeExistingPhoto(photo) {
+  if (totalPhotosCount() <= 1) {
+    photoError.value = 'Debes conservar al menos una foto de evidencia.'
+    return
+  }
+
   if (!confirm('¿Eliminar esta foto?')) return
   try {
     await store.removePhoto(route.params.id, photo.id)
     existingFotos.value = existingFotos.value.filter((p) => p.id !== photo.id)
-  } catch {
-    alert('Error al eliminar la foto.')
+    photoError.value = ''
+  } catch (err) {
+    photoError.value = err?.response?.data?.message ?? 'Error al eliminar la foto.'
   }
 }
 
@@ -564,8 +576,15 @@ function handleBackNavigation() {
 async function handleSubmit() {
   errors.value  = {}
   success.value = ''
+  photoError.value = ''
 
   if (!validateClientForm()) {
+    return
+  }
+
+  if (totalPhotosCount() < 1) {
+    photoError.value = 'Debes subir al menos una foto de evidencia.'
+    photosSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     return
   }
 
@@ -1273,7 +1292,7 @@ function validateClientForm() {
             </svg>
             Haz clic en el mapa para marcar la ubicación exacta, o arrastra el pin.
           </p>
-          <div ref="mapPickerContainer" class="w-full h-60 rounded-xl border border-gray-200 overflow-hidden shadow-sm"></div>
+          <div ref="mapPickerContainer" class="map-picker-container w-full h-60 rounded-xl border border-gray-200 overflow-hidden shadow-sm"></div>
         </div>
       </div>
 
@@ -1564,7 +1583,7 @@ function validateClientForm() {
 
         <!-- Upload & Camera buttons -->
         <div
-          v-if="!cameraActive && totalPhotosCount() < 5"
+          v-if="!cameraActive"
           class="grid grid-cols-1 lg:grid-cols-2 gap-4"
         >
           <div class="rounded-2xl border border-gray-200 p-3">
@@ -1576,7 +1595,7 @@ function validateClientForm() {
                 class="relative group"
               >
                 <img
-                  :src="photo.url"
+                  :src="resolvePhotoUrl(photo)"
                   :alt="`Foto fachada ${photo.id}`"
                   class="w-20 h-20 rounded-xl object-cover border border-gray-200"
                 />
@@ -1609,7 +1628,7 @@ function validateClientForm() {
                 </button>
               </div>
             </div>
-            <div class="flex gap-3">
+            <div v-if="totalPhotosCount() < 5" class="flex gap-3">
               <label
                 class="flex-1 flex flex-col items-center justify-center h-28 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
               >
@@ -1652,6 +1671,9 @@ function validateClientForm() {
                 <p class="text-sm text-primary font-medium">Tomar foto</p>
               </button>
             </div>
+            <p v-else class="text-xs text-gray-500 rounded-xl bg-gray-50 px-3 py-2">
+              Ya alcanzaste el máximo de 5 fotos. Elimina una si necesitas reemplazarla.
+            </p>
           </div>
 
           <div class="rounded-2xl border border-gray-200 p-3">
@@ -1663,7 +1685,7 @@ function validateClientForm() {
                 class="relative group"
               >
                 <img
-                  :src="photo.url"
+                  :src="resolvePhotoUrl(photo)"
                   :alt="`Foto DNI ${photo.id}`"
                   class="w-20 h-20 rounded-xl object-cover border border-gray-200"
                 />
@@ -1696,7 +1718,7 @@ function validateClientForm() {
                 </button>
               </div>
             </div>
-            <div class="flex gap-3">
+            <div v-if="totalPhotosCount() < 5" class="flex gap-3">
               <label
                 class="flex-1 flex flex-col items-center justify-center h-28 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
               >
@@ -1739,6 +1761,9 @@ function validateClientForm() {
                 <p class="text-sm text-primary font-medium">Tomar foto</p>
               </button>
             </div>
+            <p v-else class="text-xs text-gray-500 rounded-xl bg-gray-50 px-3 py-2">
+              Ya alcanzaste el máximo de 5 fotos. Elimina una si necesitas reemplazarla.
+            </p>
           </div>
         </div>
 
@@ -1773,4 +1798,28 @@ function validateClientForm() {
 <style scoped>
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to        { opacity: 0; }
+
+.map-picker-container {
+  position: relative;
+  z-index: 10;
+}
+
+/* Confine Leaflet controls within map container */
+:deep(.map-picker-container .leaflet-top),
+:deep(.map-picker-container .leaflet-bottom) {
+  z-index: 40;
+}
+
+:deep(.map-picker-container .leaflet-control) {
+  z-index: 40 !important;
+}
+
+:deep(.map-picker-container .leaflet-pane) {
+  z-index: 1 !important;
+}
+
+/* Prevent map from escaping in mobile */
+:deep(.map-picker-container .leaflet-container) {
+  background: white;
+}
 </style>

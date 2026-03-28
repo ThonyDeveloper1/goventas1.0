@@ -459,6 +459,12 @@ class ClientController extends Controller
             return response()->json(['message' => 'Foto no encontrada.'], 404);
         }
 
+        if ($client->photos()->count() <= 1) {
+            return response()->json([
+                'message' => 'El cliente debe conservar al menos una foto de evidencia.',
+            ], 422);
+        }
+
         Storage::disk('public')->delete($photo->photo_path);
         $photo->delete();
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Client;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -62,6 +63,35 @@ class UpdateClientRequest extends FormRequest
                     $validator->errors()->add('installacion_duracion', 'Debes indicar la duración de instalación.');
                 }
             }
+
+            $existingPhotos = $this->route('client') instanceof Client
+                ? $this->route('client')->photos()->count()
+                : 0;
+
+            $totalPhotos = $existingPhotos
+                + count($this->file('fotos', []))
+                + count($this->file('fotos_fachada', []))
+                + count($this->file('fotos_dni', []));
+
+            if ($totalPhotos < 1) {
+                $validator->errors()->add('fotos', 'Debes mantener al menos una foto de evidencia.');
+            }
+
+            if ($totalPhotos > 5) {
+                $validator->errors()->add('fotos', 'Solo se permiten máximo 5 fotos en total.');
+            }
         });
+    }
+
+    public function messages(): array
+    {
+        return [
+            'fotos.max' => 'Solo se permiten máximo 5 fotos.',
+            'fotos_fachada.max' => 'Solo se permiten máximo 5 fotos de fachada.',
+            'fotos_dni.max' => 'Solo se permiten máximo 5 fotos de DNI.',
+            'fotos.*.max' => 'Cada foto no puede superar los 4 MB.',
+            'fotos_fachada.*.max' => 'Cada foto no puede superar los 4 MB.',
+            'fotos_dni.*.max' => 'Cada foto no puede superar los 4 MB.',
+        ];
     }
 }

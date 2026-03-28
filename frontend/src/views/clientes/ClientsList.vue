@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useClientsStore } from '@/store/clients'
 import { useAuthStore } from '@/store/auth'
 import api from '@/services/api'
+import { resolvePhotoUrl } from '@/utils/photoUrl'
 
 const router  = useRouter()
 const route   = useRoute()
@@ -395,28 +396,7 @@ function installationRange(installation) {
 }
 
 function reviewPhotoSrc(photo) {
-  const rawUrl = (photo?.url || '').trim()
-  if (!rawUrl && photo?.photo_path) {
-    return `/storage/${String(photo.photo_path).replace(/^\/+/, '')}`
-  }
-
-  if (!rawUrl) return ''
-
-  if (rawUrl.startsWith('/storage/')) return rawUrl
-  if (rawUrl.startsWith('storage/')) return `/${rawUrl}`
-
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(rawUrl)) {
-    try {
-      const parsed = new URL(rawUrl)
-      if (parsed.pathname.startsWith('/storage/')) {
-        return parsed.pathname
-      }
-    } catch {
-      return rawUrl
-    }
-  }
-
-  return rawUrl
+  return resolvePhotoUrl(photo)
 }
 
 function reviewPhotosByType(client, type) {
