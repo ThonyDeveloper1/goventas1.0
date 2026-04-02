@@ -41,8 +41,6 @@ const navItems = computed(() => {
     { label: 'Instalaciones',   to: '/instalaciones',      icon: 'tool',     roles: ['admin', 'supervisor', 'vendedora'] },
     { label: 'Credenciales',    to: '/credenciales',       icon: 'key',      roles: ['admin', 'supervisor', 'vendedora'] },
     { label: 'Supervisiones',   to: '/supervisiones',      icon: 'clipboard',roles: ['admin', 'supervisor'] },
-    { label: 'Red',             to: '/red',                icon: 'wifi',     roles: ['admin'] },
-    { label: 'Morosos ISP',      to: '/red/morosos',        icon: 'ban',      roles: ['admin'] },
     { label: 'Ventas Sospechosas', to: '/ventas-sospechosas', icon: 'shield', roles: ['admin'] },
     { label: 'Reportes',        to: '/reportes',           icon: 'chart',    roles: ['admin'] },
     { label: 'Mapa',            to: '/reportes/mapa',      icon: 'map',      roles: ['admin'] },
@@ -200,14 +198,6 @@ function toggleGroup(key) {
         <!-- Clipboard / Supervisions -->
         <svg v-else-if="item.icon === 'clipboard'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
-        <!-- Wifi / Red -->
-        <svg v-else-if="item.icon === 'wifi'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-        </svg>
-        <!-- Ban / Morosos -->
-        <svg v-else-if="item.icon === 'ban'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
         </svg>
         <!-- Shield / Sospechosas -->
         <svg v-else-if="item.icon === 'shield'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

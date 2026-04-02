@@ -308,10 +308,7 @@ const estadoColor = {
             <span class="text-xl">📊</span>
             <span class="text-xs text-gray-600">Reportes</span>
           </button>
-          <button @click="router.push('/red')" class="flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-200 hover:bg-primary/5 hover:border-primary/30 transition-colors">
-            <span class="text-xl">🌐</span>
-            <span class="text-xs text-gray-600">Estado de Red</span>
-          </button>
+
         </div>
       </div>
     </template>

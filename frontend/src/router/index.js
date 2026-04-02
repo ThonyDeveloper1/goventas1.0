@@ -124,20 +124,6 @@ const routes = [
         meta: { roles: ['admin', 'supervisor'] },
       },
 
-      /* ── Network / MikroTik ─────────────────────────────────── */
-      {
-        path: 'red',
-        name: 'EstadoRed',
-        component: () => import('@/views/red/NetworkStatus.vue'),
-        meta: { roles: ['admin'] },
-      },
-      {
-        path: 'red/morosos',
-        name: 'CortesMorosos',
-        component: () => import('@/views/red/CortesMorosos.vue'),
-        meta: { roles: ['admin'] },
-      },
-
       /* ── Suspicious Sales / Fraud Detection ───────────────── */
       {
         path: 'ventas-sospechosas',
