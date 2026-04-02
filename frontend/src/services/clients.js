@@ -56,6 +56,10 @@ export default {
     return api.post(`/clients/${clientId}/assign-ip`, data)
   },
 
+  clearIp(clientId) {
+    return api.post(`/clients/${clientId}/clear-ip`)
+  },
+
   ipHistory(clientId, page = 1) {
     return api.get(`/clients/${clientId}/ip-history`, { params: { page } })
   },

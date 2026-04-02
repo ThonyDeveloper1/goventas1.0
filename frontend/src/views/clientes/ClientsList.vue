@@ -40,6 +40,7 @@ const showAssignIpModal = ref(false)
 const assignIpForm = ref({ ip: '', notes: '' })
 const assignIpError = ref('')
 const assigningIp = ref(false)
+const clearingIp = ref(false)
 const ipHistoryList = ref([])
 const ipHistoryLoading = ref(false)
 const ipHistoryPage = ref(1)
@@ -57,7 +58,7 @@ async function openAssignIpModal() {
 }
 
 function closeAssignIpModal() {
-  if (assigningIp.value) return
+  if (assigningIp.value || clearingIp.value) return
   showAssignIpModal.value = false
 }
 
@@ -73,6 +74,21 @@ async function loadIpHistory(page = 1) {
     console.error('Error loading IP history:', e)
   } finally {
     ipHistoryLoading.value = false
+  }
+}
+
+async function submitClearIp() {
+  if (!selectedClient.value || !selectedClient.value.ip_override) return
+  if (!confirm(`¿Limpiar la IP asignada manualmente (${selectedClient.value.ip_address})?\n\nEl cliente volverá a usar la lógica automática de MikroTik.`)) return
+  clearingIp.value = true
+  try {
+    const data = await store.clearIp(selectedClient.value.id)
+    ipHistoryList.value = data.history ?? []
+    ipHistoryPage.value = 1
+  } catch (e) {
+    alert(e?.response?.data?.message ?? 'No se pudo limpiar la IP.')
+  } finally {
+    clearingIp.value = false
   }
 }
 
@@ -1556,23 +1572,40 @@ async function copyToClipboard(text) {
           </div>
 
           <!-- Action buttons -->
-          <div class="flex justify-end gap-2">
+          <div class="flex justify-between gap-2">
+            <!-- Limpiar IP (solo si hay ip_override activo) -->
             <button
+              v-if="selectedClient?.ip_override"
               type="button"
-              class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 transition-colors"
-              :disabled="assigningIp"
-              @click="closeAssignIpModal"
+              class="px-3 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center gap-1.5"
+              :disabled="clearingIp || assigningIp"
+              @click="submitClearIp"
             >
-              Cancelar
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              {{ clearingIp ? 'Limpiando...' : 'Limpiar IP asignada' }}
             </button>
-            <button
-              type="button"
-              class="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-60"
-              :disabled="assigningIp || !assignIpForm.ip.trim()"
-              @click="submitAssignIp"
-            >
-              {{ assigningIp ? 'Asignando...' : 'Asignar IP' }}
-            </button>
+            <div v-else />
+
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 transition-colors"
+                :disabled="assigningIp || clearingIp"
+                @click="closeAssignIpModal"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                class="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-60"
+                :disabled="assigningIp || clearingIp || !assignIpForm.ip.trim()"
+                @click="submitAssignIp"
+              >
+                {{ assigningIp ? 'Asignando...' : 'Asignar IP' }}
+              </button>
+            </div>
           </div>
 
           <!-- History section -->
@@ -1610,7 +1643,9 @@ async function copyToClipboard(text) {
                   <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
-                  <span class="font-semibold text-gray-800">{{ entry.new_ip }}</span>
+                  <span :class="entry.new_ip ? 'font-semibold text-gray-800' : 'text-red-500 font-semibold'">
+                    {{ entry.new_ip ?? '[limpiada]' }}
+                  </span>
                 </div>
                 <p v-if="entry.notes" class="text-gray-500 mt-1 not-italic">{{ entry.notes }}</p>
               </div>

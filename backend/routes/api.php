@@ -63,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('clients/{client}/status', [ClientController::class, 'updateStatus']);
         Route::post('clients/{client}/status', [ClientController::class, 'updateStatus']);
         Route::post('clients/{client}/assign-ip', [ClientController::class, 'assignIp']);
+        Route::post('clients/{client}/clear-ip',  [ClientController::class, 'clearIp']);
         Route::get('clients/{client}/ip-history', [ClientController::class, 'ipHistory']);
         Route::delete('clients/{client}', [ClientController::class, 'destroy']);
     });

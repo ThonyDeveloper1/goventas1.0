@@ -146,6 +146,21 @@ export const useClientsStore = defineStore('clients', () => {
     return data
   }
 
+  async function clearIp(id) {
+    const { data } = await clientsApi.clearIp(id)
+    const idx = items.value.findIndex((c) => c.id === id)
+    if (idx !== -1) {
+      items.value[idx] = {
+        ...items.value[idx],
+        ip_address: null,
+        ip_override: false,
+        mikrotik_estado: 'sin_datos',
+        mikrotik_ip: null,
+      }
+    }
+    return data
+  }
+
   async function fetchIpHistory(id, page = 1) {
     const { data } = await clientsApi.ipHistory(id, page)
     return data
@@ -179,6 +194,7 @@ export const useClientsStore = defineStore('clients', () => {
     removePhoto,
     lookupDni,
     assignIp,
+    clearIp,
     fetchIpHistory,
     setFilter,
     resetFilters,

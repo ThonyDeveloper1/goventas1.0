@@ -532,6 +532,48 @@ class ClientController extends Controller
     }
 
     /* ─────────────────────────────────────────────────────────
+     |  POST /clients/{client}/clear-ip  (admin only)
+     ────────────────────────────────────────────────────────── */
+    public function clearIp(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()?->isAdmin()) {
+            return response()->json(['message' => 'Solo un administrador puede limpiar IPs.'], 403);
+        }
+
+        if (! $client->ip_override) {
+            return response()->json(['message' => 'Este cliente no tiene una IP asignada manualmente.'], 422);
+        }
+
+        $previousIp = $client->ip_address;
+
+        \App\Models\ClientIpHistory::create([
+            'client_id'   => $client->id,
+            'previous_ip' => $previousIp,
+            'new_ip'      => null,
+            'assigned_by' => $request->user()->id,
+            'notes'       => 'IP manual limpiada.',
+        ]);
+
+        $client->update([
+            'ip_address'  => null,
+            'ip_override' => false,
+        ]);
+
+        $history = \App\Models\ClientIpHistory::where('client_id', $client->id)
+            ->with('assignedBy:id,name')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'message'     => 'IP manual eliminada correctamente.',
+            'ip_address'  => null,
+            'ip_override' => false,
+            'history'     => $history,
+        ]);
+    }
+
+    /* ─────────────────────────────────────────────────────────
      |  DELETE /clients/{client}/photos/{photo}
      ────────────────────────────────────────────────────────── */
     public function destroyPhoto(Request $request, Client $client, ClientPhoto $photo): JsonResponse
