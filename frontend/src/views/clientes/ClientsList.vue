@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClientsStore } from '@/store/clients'
 import { useAuthStore } from '@/store/auth'
@@ -30,6 +30,14 @@ const vendorOptions = ref([])
 const selectedMonth = ref(new Date().toISOString().slice(0, 7))
 const allMonths = ref(false)
 let mikrotikAutoRefreshTimer = null
+
+/* ── Row selection ──────────────────────────────────── */
+const selectedClientId = ref(null)
+const selectedClient = computed(() => store.items.find(c => c.id === selectedClientId.value) ?? null)
+
+function toggleSelect(client) {
+  selectedClientId.value = selectedClientId.value === client.id ? null : client.id
+}
 
 onMounted(async () => {
   if (!allMonths.value) {
@@ -212,6 +220,10 @@ watch(searchInput, (val) => {
   }, 400)
 })
 
+watch(() => store.pagination.current_page, () => {
+  selectedClientId.value = null
+})
+
 /* ── Actions ────────────────────────────────────────── */
 function applyFilter(key, val) {
   store.setFilter(key, val)
@@ -332,6 +344,26 @@ async function deleteClient(client) {
   } catch (e) {
     alert(e?.response?.data?.message ?? 'Error al eliminar el cliente.')
   }
+}
+
+function toolbarView() {
+  if (!selectedClient.value) return
+  router.push(`/clientes/${selectedClient.value.id}`)
+}
+
+function toolbarEdit() {
+  if (!selectedClient.value) return
+  router.push(`/clientes/${selectedClient.value.id}/editar`)
+}
+
+function toolbarReview() {
+  if (!selectedClient.value) return
+  openReviewModal(selectedClient.value)
+}
+
+function toolbarDelete() {
+  if (!selectedClient.value) return
+  deleteClient(selectedClient.value)
 }
 
 function refreshMikrotikState() {
@@ -568,6 +600,69 @@ async function copyToClipboard(text) {
     <!-- Table card -->
     <div class="card p-0 overflow-hidden">
 
+      <!-- ── Action toolbar ── -->
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-white">
+        <!-- Selection info -->
+        <div class="flex items-center gap-1.5 text-xs mr-2 min-w-0 max-w-xs">
+          <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span v-if="selectedClient" class="font-semibold text-gray-700 truncate">{{ selectedClient.nombre_completo }}</span>
+          <span v-else class="text-gray-400">Selecciona un cliente de la tabla</span>
+        </div>
+
+        <!-- Ver -->
+        <button
+          @click="toolbarView"
+          :disabled="!selectedClient"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-primary text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+          Ver
+        </button>
+
+        <!-- Editar -->
+        <button
+          @click="toolbarEdit"
+          :disabled="!selectedClient"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-blue-600 text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+          Editar
+        </button>
+
+        <!-- Revisar Estado (admin) -->
+        <button
+          v-if="auth.isAdmin"
+          @click="toolbarReview"
+          :disabled="!selectedClient"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-indigo-600 text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Revisar Estado
+        </button>
+
+        <!-- Eliminar (admin) -->
+        <button
+          v-if="auth.isAdmin"
+          @click="toolbarDelete"
+          :disabled="!selectedClient"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-red-600 text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          Eliminar
+        </button>
+      </div>
+
       <!-- Loading state -->
       <div v-if="store.loading" class="flex items-center justify-center py-16">
         <svg class="w-8 h-8 text-primary animate-spin" fill="none" viewBox="0 0 24 24">
@@ -594,6 +689,7 @@ async function copyToClipboard(text) {
         <table class="w-full min-w-[980px] text-sm">
           <thead>
             <tr class="border-b border-gray-100 bg-gray-50/60">
+              <th class="w-10 px-3 py-3" />
               <th class="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Cliente</th>
               <th class="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">DNI</th>
               <th class="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Teléfono</th>
@@ -603,15 +699,25 @@ async function copyToClipboard(text) {
               <th class="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Estado</th>
               <th class="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Estado MikroTik</th>
               <th v-if="auth.isAdmin" class="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide hidden xl:table-cell">Vendedora</th>
-              <th class="px-5 py-3" />
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
             <tr
               v-for="client in store.items"
               :key="client.id"
-              class="hover:bg-gray-50/50 transition-colors group"
+              class="transition-colors cursor-pointer select-none"
+              :class="selectedClientId === client.id ? 'bg-primary/5 border-l-[3px] border-primary' : 'hover:bg-gray-50/60'"
+              @click="toggleSelect(client)"
             >
+              <!-- Checkbox -->
+              <td class="px-3 py-3.5 w-10">
+                <div :class="['w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all', selectedClientId === client.id ? 'bg-primary border-primary' : 'border-gray-300']">
+                  <svg v-if="selectedClientId === client.id" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+              </td>
+
               <!-- Name + initials -->
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-3">
@@ -663,49 +769,6 @@ async function copyToClipboard(text) {
                 {{ client.vendedora?.name ?? '—' }}
               </td>
 
-              <!-- Actions -->
-              <td class="px-5 py-3.5">
-                <div class="flex items-center gap-2">
-                  <router-link
-                    :to="`/clientes/${client.id}`"
-                    class="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center shadow-sm hover:brightness-110 transition-all"
-                    title="Ver detalle"
-                  >
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </router-link>
-                  <router-link
-                    :to="`/clientes/${client.id}/editar`"
-                    class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm hover:brightness-110 transition-all"
-                    title="Editar"
-                  >
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </router-link>
-                  <button
-                    v-if="auth.isAdmin"
-                    @click="openReviewModal(client)"
-                    class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm hover:brightness-110 transition-all"
-                    title="Revisar datos y cambiar estado"
-                  >
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  <button
-                    v-if="auth.isAdmin"
-                    @click="deleteClient(client)"
-                    class="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center shadow-sm hover:brightness-110 transition-all"
-                    title="Eliminar"
-                  >
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
             </tr>
           </tbody>
         </table>
