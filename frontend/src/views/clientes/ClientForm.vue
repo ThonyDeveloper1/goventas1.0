@@ -18,7 +18,8 @@ const plansStore   = usePlansStore()
 
 /* ── Mode ───────────────────────────────────────────── */
 const isEdit  = computed(() => !!route.params.id)
-const title   = computed(() => isEdit.value ? 'Editar Cliente' : 'Nuevo Cliente')
+const isViewOnly = computed(() => !!route.params.id && !route.path.endsWith('/editar'))
+const title   = computed(() => isViewOnly.value ? 'Ver Cliente' : isEdit.value ? 'Editar Cliente' : 'Nuevo Cliente')
 
 /* ── Form state ─────────────────────────────────────── */
 const saving  = ref(false)
@@ -1848,7 +1849,7 @@ function validateClientForm() {
       </div>
 
       <!-- ── Submit ─────────────────────────────────────────── -->
-      <div class="flex gap-3 justify-end">
+      <div v-if="!isViewOnly" class="flex gap-3 justify-end">
         <button
           type="button"
           @click="handleBackNavigation"
