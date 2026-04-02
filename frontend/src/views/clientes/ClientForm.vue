@@ -1298,15 +1298,6 @@ function validateClientForm() {
         </h3>
         <p class="text-xs text-gray-400 mb-4 ml-8">Coordenadas exactas del punto de instalación</p>
 
-        <div v-if="geoPermissionState === 'denied'" class="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-          <p class="text-xs text-amber-700 font-medium">Ubicación bloqueada en el navegador.</p>
-          <p class="text-xs text-amber-600 mt-1">Activa el permiso de ubicación para este sitio y vuelve a pulsar "Usar mi ubicación actual".</p>
-        </div>
-
-        <div v-else-if="geoPermissionState === 'prompt'" class="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2">
-          <p class="text-xs text-blue-700">Al pulsar el botón, acepta el permiso para usar tu ubicación.</p>
-        </div>
-
         <div class="flex flex-col sm:flex-row gap-3 mb-3">
           <div class="flex-1">
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Latitud *</label>
@@ -1333,22 +1324,6 @@ function validateClientForm() {
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            @click="getCurrentLocation"
-            :disabled="geoLoading"
-            class="flex items-center gap-2 text-sm text-primary font-medium hover:text-primary-700 disabled:opacity-50 transition-colors"
-          >
-            <svg v-if="!geoLoading" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            {{ geoLoading ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual' }}
-          </button>
-
           <button
             type="button"
             @click="useDefaultCoordinates"
