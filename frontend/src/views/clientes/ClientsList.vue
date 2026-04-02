@@ -28,7 +28,7 @@ const reviewStepLabels = [
 ]
 const vendorOptions = ref([])
 const selectedMonth = ref(new Date().toISOString().slice(0, 7))
-const allMonths = ref(false)
+const allMonths = ref(true)
 let mikrotikAutoRefreshTimer = null
 
 /* ── Row selection ──────────────────────────────────── */
@@ -40,6 +40,10 @@ function toggleSelect(client) {
 }
 
 onMounted(async () => {
+  // Start with no date filter — show all clients
+  store.setFilter('from', '')
+  store.setFilter('to', '')
+
   if (!allMonths.value) {
     applyMonthToFilters(selectedMonth.value)
   }
