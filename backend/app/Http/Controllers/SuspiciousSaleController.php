@@ -192,40 +192,39 @@ class SuspiciousSaleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Venta rechazada. El cliente permanece marcado como sospechoso.',
+            'data'    => $sale->fresh()->load(['client:id,dni,nombres,apellidos', 'reviewer:id,name']),
+        ]);
+    }
 
-                /* ─────────────────────────────────────────────────────────
-                 |  POST /suspicious-sales/{id}/unapprove
-                 ────────────────────────────────────────────────────────── */
-                public function unapprove(int $id): JsonResponse
-                {
-                    $sale = SuspiciousSale::findOrFail($id);
+    /* ─────────────────────────────────────────────────────────
+     |  POST /suspicious-sales/{id}/unapprove
+     ────────────────────────────────────────────────────────── */
+    public function unapprove(int $id): JsonResponse
+    {
+        $sale = SuspiciousSale::findOrFail($id);
 
-                    if ($sale->status === 'pendiente') {
-                        return response()->json([
-                            'message' => 'Esta venta ya está pendiente de revisión.',
-                        ], 422);
-                    }
+        if ($sale->status === 'pendiente') {
+            return response()->json([
+                'message' => 'Esta venta ya está pendiente de revisión.',
+            ], 422);
+        }
 
-                    $wasApproved = $sale->status === 'aprobado';
+        $wasApproved = $sale->status === 'aprobado';
 
-                    $sale->update([
-                        'status'      => 'pendiente',
-                        'reviewed_by' => null,
-                        'reviewed_at' => null,
-                    ]);
+        $sale->update([
+            'status'      => 'pendiente',
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+        ]);
 
-                    // Restore suspicious flag if approval had cleared it
-                    if ($wasApproved) {
-                        $sale->client->update(['is_suspicious' => true]);
-                    }
+        // Restore suspicious flag if approval had cleared it
+        if ($wasApproved) {
+            $sale->client->update(['is_suspicious' => true]);
+        }
 
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Revisión anulada. La venta vuelve a estado pendiente.',
-                        'data'    => $sale->fresh()->load(['client:id,dni,nombres,apellidos', 'reviewer:id,name']),
-                    ]);
-                }
-            }
+        return response()->json([
+            'success' => true,
+            'message' => 'Revisión anulada. La venta vuelve a estado pendiente.',
             'data'    => $sale->fresh()->load(['client:id,dni,nombres,apellidos', 'reviewer:id,name']),
         ]);
     }
