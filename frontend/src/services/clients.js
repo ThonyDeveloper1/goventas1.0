@@ -51,6 +51,14 @@ export default {
   lookupDni(dni) {
     return api.get(`/reniec/${dni}`)
   },
+
+  assignIp(clientId, data) {
+    return api.post(`/clients/${clientId}/assign-ip`, data)
+  },
+
+  ipHistory(clientId, page = 1) {
+    return api.get(`/clients/${clientId}/ip-history`, { params: { page } })
+  },
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */

@@ -131,6 +131,26 @@ export const useClientsStore = defineStore('clients', () => {
     return data
   }
 
+  async function assignIp(id, payload) {
+    const { data } = await clientsApi.assignIp(id, payload)
+    const idx = items.value.findIndex((c) => c.id === id)
+    if (idx !== -1) {
+      items.value[idx] = {
+        ...items.value[idx],
+        ip_address: data.ip_address,
+        ip_override: data.ip_override,
+        mikrotik_estado: data.mikrotik_estado ?? items.value[idx].mikrotik_estado,
+        mikrotik_ip: data.mikrotik_ip ?? items.value[idx].mikrotik_ip,
+      }
+    }
+    return data
+  }
+
+  async function fetchIpHistory(id, page = 1) {
+    const { data } = await clientsApi.ipHistory(id, page)
+    return data
+  }
+
   function setFilter(key, value) {
     filters.value[key] = value
   }
@@ -158,6 +178,8 @@ export const useClientsStore = defineStore('clients', () => {
     removeClient,
     removePhoto,
     lookupDni,
+    assignIp,
+    fetchIpHistory,
     setFilter,
     resetFilters,
     clearCurrent,

@@ -622,6 +622,23 @@ class MikrotikIspService
                 'ip' => null,
             ];
 
+            $clientIp = trim((string) ($client->ip_address ?? ''));
+
+            // ── ip_override: skip mikrotik_user lookup, use stored IP directly ──
+            if ($client->ip_override && $clientIp !== '') {
+                if (isset($morosoByIp[$clientIp])) {
+                    $result[$client->id] = ['status' => 'moroso', 'ip' => $clientIp];
+                    continue;
+                }
+                if (isset($secretByIp[$clientIp])) {
+                    $result[$client->id] = ['status' => 'no_moroso', 'ip' => $clientIp];
+                    continue;
+                }
+                // IP not found in router yet — report sin_datos but do not fall through to name matching.
+                $result[$client->id] = ['status' => 'sin_datos', 'ip' => null];
+                continue;
+            }
+
             $clientUser = trim((string) ($client->mikrotik_user ?? ''));
             if ($clientUser !== '' && isset($secretByName[$clientUser])) {
                 $secret = $secretByName[$clientUser];

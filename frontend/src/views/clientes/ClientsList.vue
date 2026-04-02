@@ -35,6 +35,78 @@ let mikrotikAutoRefreshTimer = null
 const selectedClientId = ref(null)
 const selectedClient = computed(() => store.items.find(c => c.id === selectedClientId.value) ?? null)
 
+/* ── Asignar IP modal ───────────────────────────────── */
+const showAssignIpModal = ref(false)
+const assignIpForm = ref({ ip: '', notes: '' })
+const assignIpError = ref('')
+const assigningIp = ref(false)
+const ipHistoryList = ref([])
+const ipHistoryLoading = ref(false)
+const ipHistoryPage = ref(1)
+const ipHistoryLastPage = ref(1)
+
+async function openAssignIpModal() {
+  if (!selectedClient.value) return
+  assignIpForm.value = { ip: '', notes: '' }
+  assignIpError.value = ''
+  ipHistoryList.value = []
+  ipHistoryPage.value = 1
+  ipHistoryLastPage.value = 1
+  showAssignIpModal.value = true
+  await loadIpHistory(1)
+}
+
+function closeAssignIpModal() {
+  if (assigningIp.value) return
+  showAssignIpModal.value = false
+}
+
+async function loadIpHistory(page = 1) {
+  if (!selectedClient.value) return
+  ipHistoryLoading.value = true
+  try {
+    const res = await store.fetchIpHistory(selectedClient.value.id, page)
+    ipHistoryList.value = res.data ?? []
+    ipHistoryPage.value = res.current_page ?? 1
+    ipHistoryLastPage.value = res.last_page ?? 1
+  } catch (e) {
+    console.error('Error loading IP history:', e)
+  } finally {
+    ipHistoryLoading.value = false
+  }
+}
+
+async function submitAssignIp() {
+  assignIpError.value = ''
+  const ipVal = assignIpForm.value.ip.trim()
+  if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipVal)) {
+    assignIpError.value = 'Formato de IP inválido. Ejemplo: 192.168.1.100'
+    return
+  }
+  if (!selectedClient.value) return
+  assigningIp.value = true
+  try {
+    await store.assignIp(selectedClient.value.id, {
+      ip: ipVal,
+      notes: assignIpForm.value.notes.trim() || null,
+    })
+    assignIpForm.value = { ip: '', notes: '' }
+    await loadIpHistory(1)
+  } catch (e) {
+    assignIpError.value = e?.response?.data?.message ?? 'No se pudo asignar la IP. Intenta nuevamente.'
+  } finally {
+    assigningIp.value = false
+  }
+}
+
+function formatHistoryDate(dateStr) {
+  if (!dateStr) return '—'
+  return new Date(dateStr).toLocaleString('es-PE', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 function toggleSelect(client) {
   selectedClientId.value = selectedClientId.value === client.id ? null : client.id
 }
@@ -395,6 +467,7 @@ async function refreshVisibleMikrotikStatuses(force = false) {
       client.mikrotik_estado = current.mikrotik_estado ?? 'sin_datos'
       client.mikrotik_ip = current.mikrotik_ip ?? null
       client.ip_address = current.ip_address ?? client.ip_address
+      if (current.ip_override !== undefined) client.ip_override = current.ip_override
     })
 
     if (reviewClient.value?.id) {
@@ -653,6 +726,19 @@ async function copyToClipboard(text) {
           Revisar Estado
         </button>
 
+        <!-- Asignar IP (admin) -->
+        <button
+          v-if="auth.isAdmin"
+          @click="openAssignIpModal"
+          :disabled="!selectedClient"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-amber-500 text-white hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+          </svg>
+          Asignar IP
+        </button>
+
         <!-- Eliminar (admin) -->
         <button
           v-if="auth.isAdmin"
@@ -743,9 +829,22 @@ async function copyToClipboard(text) {
               <td class="px-5 py-3.5">
                 <span
                   v-if="client.mikrotik_estado !== 'sin_datos' && (client.mikrotik_ip || client.ip_address)"
-                  class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded"
+                  class="inline-flex items-center gap-1.5 font-mono text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded"
                 >
                   {{ client.mikrotik_ip || client.ip_address }}
+                  <span
+                    v-if="client.ip_override"
+                    class="w-2 h-2 rounded-full bg-pink-400 flex-shrink-0"
+                    title="IP asignada manualmente"
+                  />
+                </span>
+                <span v-else-if="client.ip_address" class="inline-flex items-center gap-1.5 font-mono text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded">
+                  {{ client.ip_address }}
+                  <span
+                    v-if="client.ip_override"
+                    class="w-2 h-2 rounded-full bg-pink-400 flex-shrink-0"
+                    title="IP asignada manualmente"
+                  />
                 </span>
                 <span v-else class="text-xs text-gray-300">—</span>
               </td>
@@ -1389,5 +1488,157 @@ async function copyToClipboard(text) {
         </div>
       </div>
     </div>
+
+    <!-- ── Asignar IP Modal ── -->
+    <div
+      v-if="showAssignIpModal && selectedClient"
+      class="fixed inset-0 z-50 flex items-center justify-center px-4"
+    >
+      <div class="absolute inset-0 bg-black/40" @click="closeAssignIpModal" />
+
+      <div class="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden max-h-[90vh] flex flex-col">
+
+        <!-- Modal header -->
+        <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 flex-shrink-0">
+          <div>
+            <h3 class="text-base font-bold text-gray-900">Asignar IP</h3>
+            <p class="text-sm text-gray-500 mt-0.5">{{ selectedClient.nombre_completo }}</p>
+            <p v-if="selectedClient.ip_address" class="text-xs text-gray-400 mt-1 font-mono">
+              IP actual:
+              <span class="inline-flex items-center gap-1">
+                {{ selectedClient.ip_address }}
+                <span v-if="selectedClient.ip_override" class="w-2 h-2 rounded-full bg-pink-400" title="Asignada manualmente" />
+              </span>
+            </p>
+            <p v-else class="text-xs text-gray-400 mt-1">Sin IP asignada</p>
+          </div>
+          <button
+            type="button"
+            class="text-gray-400 hover:text-gray-700 transition-colors"
+            :disabled="assigningIp"
+            @click="closeAssignIpModal"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Modal body -->
+        <div class="overflow-y-auto flex-1 p-5 space-y-5">
+
+          <!-- IP form -->
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Nueva dirección IP *</label>
+              <input
+                v-model="assignIpForm.ip"
+                type="text"
+                placeholder="Ej: 192.168.1.100"
+                class="input font-mono"
+                :disabled="assigningIp"
+                @keyup.enter="submitAssignIp"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">
+                Notas <span class="font-normal text-gray-400">(opcional)</span>
+              </label>
+              <textarea
+                v-model="assignIpForm.notes"
+                rows="2"
+                placeholder="Motivo del cambio de IP..."
+                class="input resize-none"
+                :disabled="assigningIp"
+              />
+            </div>
+            <p v-if="assignIpError" class="text-xs text-red-600 font-medium">{{ assignIpError }}</p>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 transition-colors"
+              :disabled="assigningIp"
+              @click="closeAssignIpModal"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-60"
+              :disabled="assigningIp || !assignIpForm.ip.trim()"
+              @click="submitAssignIp"
+            >
+              {{ assigningIp ? 'Asignando...' : 'Asignar IP' }}
+            </button>
+          </div>
+
+          <!-- History section -->
+          <div class="border-t border-gray-100 pt-4">
+            <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Historial de cambios de IP
+            </h4>
+
+            <div v-if="ipHistoryLoading" class="flex justify-center py-4">
+              <svg class="w-5 h-5 text-primary animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+
+            <div v-else-if="!ipHistoryList.length" class="text-xs text-gray-400 text-center py-4">
+              Sin historial de cambios de IP.
+            </div>
+
+            <div v-else class="space-y-2">
+              <div
+                v-for="entry in ipHistoryList"
+                :key="entry.id"
+                class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-xs"
+              >
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <span class="text-gray-400">{{ formatHistoryDate(entry.created_at) }}</span>
+                  <span class="text-gray-500 font-medium">{{ entry.assigned_by?.name ?? '—' }}</span>
+                </div>
+                <div class="flex items-center gap-2 font-mono">
+                  <span class="text-gray-400">{{ entry.previous_ip ?? 'sin IP' }}</span>
+                  <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                  <span class="font-semibold text-gray-800">{{ entry.new_ip }}</span>
+                </div>
+                <p v-if="entry.notes" class="text-gray-500 mt-1 not-italic">{{ entry.notes }}</p>
+              </div>
+
+              <!-- Pagination for history -->
+              <div v-if="ipHistoryLastPage > 1" class="flex justify-center gap-2 pt-2">
+                <button
+                  class="px-3 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 hover:border-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="ipHistoryPage === 1 || ipHistoryLoading"
+                  @click="loadIpHistory(ipHistoryPage - 1)"
+                >
+                  ← Anterior
+                </button>
+                <span class="px-2 py-1 text-xs text-gray-500">{{ ipHistoryPage }} / {{ ipHistoryLastPage }}</span>
+                <button
+                  class="px-3 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 hover:border-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="ipHistoryPage === ipHistoryLastPage || ipHistoryLoading"
+                  @click="loadIpHistory(ipHistoryPage + 1)"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>

@@ -62,6 +62,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::patch('clients/{client}/status', [ClientController::class, 'updateStatus']);
         Route::post('clients/{client}/status', [ClientController::class, 'updateStatus']);
+        Route::post('clients/{client}/assign-ip', [ClientController::class, 'assignIp']);
+        Route::get('clients/{client}/ip-history', [ClientController::class, 'ipHistory']);
         Route::delete('clients/{client}', [ClientController::class, 'destroy']);
     });
 

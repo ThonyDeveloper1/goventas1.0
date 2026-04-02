@@ -32,6 +32,7 @@ class Client extends Model
         'mikrotik_password',
         'mikrotik_profile',
         'ip_address',
+        'ip_override',
         'service_status',
         'is_suspicious',
         'risk_score',
@@ -49,6 +50,7 @@ class Client extends Model
             'latitud'            => 'float',
             'longitud'           => 'float',
             'is_suspicious'      => 'boolean',
+            'ip_override'        => 'boolean',
             'risk_score'         => 'integer',
             'fecha_vencimiento'  => 'date',
         ];
@@ -91,6 +93,11 @@ class Client extends Model
     public function pagos(): HasMany
     {
         return $this->hasMany(\App\Models\Pago::class);
+    }
+
+    public function ipHistory(): HasMany
+    {
+        return $this->hasMany(ClientIpHistory::class)->latest();
     }
 
     public function latestInstallation(): HasOne

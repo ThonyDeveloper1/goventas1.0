@@ -237,7 +237,7 @@ class ClientController extends Controller
         }
 
         $clients = Client::query()
-            ->select('id', 'nombres', 'apellidos', 'mikrotik_user', 'ip_address')
+            ->select('id', 'nombres', 'apellidos', 'mikrotik_user', 'ip_address', 'ip_override')
             ->whereIn('id', $ids)
             ->forUser($user)
             ->get();
@@ -248,10 +248,11 @@ class ClientController extends Controller
             $state = $snapshot[$client->id] ?? ['status' => 'sin_datos', 'ip' => null];
 
             return [
-                'id' => $client->id,
+                'id'              => $client->id,
                 'mikrotik_estado' => $state['status'] ?? 'sin_datos',
-                'mikrotik_ip' => $state['ip'] ?? null,
-                'ip_address' => $client->ip_address,
+                'mikrotik_ip'     => $state['ip'] ?? null,
+                'ip_address'      => $client->ip_address,
+                'ip_override'     => (bool) $client->ip_override,
             ];
         })->values();
 
@@ -445,6 +446,89 @@ class ClientController extends Controller
                 'message' => 'No se pudo eliminar el cliente. Intenta nuevamente.',
             ], 500);
         }
+    }
+
+    /* ─────────────────────────────────────────────────────────
+     |  POST /clients/{client}/assign-ip  (admin only)
+     ────────────────────────────────────────────────────────── */
+    public function assignIp(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()?->isAdmin()) {
+            return response()->json(['message' => 'Solo un administrador puede asignar IPs.'], 403);
+        }
+
+        $validated = $request->validate([
+            'ip'    => ['required', 'ip'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $newIp    = $validated['ip'];
+        $notes    = $validated['notes'] ?? null;
+        $previousIp = $client->ip_address;
+
+        if ($newIp === $previousIp) {
+            return response()->json(['message' => 'La IP ingresada es la misma que ya tiene asignada.'], 422);
+        }
+
+        \App\Models\ClientIpHistory::create([
+            'client_id'   => $client->id,
+            'previous_ip' => $previousIp,
+            'new_ip'      => $newIp,
+            'assigned_by' => $request->user()->id,
+            'notes'       => $notes,
+        ]);
+
+        $client->update([
+            'ip_address'  => $newIp,
+            'ip_override' => true,
+        ]);
+
+        $routerId = MikrotikRouter::where('is_active', true)->value('id');
+        $mikrotikStatus = ['mikrotik_estado' => 'sin_datos', 'mikrotik_ip' => null];
+        if ($routerId) {
+            try {
+                $snapshot = $this->buildMikrotikSnapshotMap(collect([$client]));
+                $state = $snapshot[$client->id] ?? null;
+                if ($state) {
+                    $mikrotikStatus['mikrotik_estado'] = $state['status'] ?? 'sin_datos';
+                    $mikrotikStatus['mikrotik_ip']     = $state['ip'] ?? null;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('assignIp: fallo en snapshot MikroTik.', ['error' => $e->getMessage()]);
+            }
+        }
+
+        $history = \App\Models\ClientIpHistory::where('client_id', $client->id)
+            ->with('assignedBy:id,name')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'message'        => 'IP asignada correctamente.',
+            'ip_address'     => $client->fresh()->ip_address,
+            'ip_override'    => true,
+            'mikrotik_estado'=> $mikrotikStatus['mikrotik_estado'],
+            'mikrotik_ip'    => $mikrotikStatus['mikrotik_ip'],
+            'history'        => $history,
+        ]);
+    }
+
+    /* ─────────────────────────────────────────────────────────
+     |  GET /clients/{client}/ip-history  (admin only)
+     ────────────────────────────────────────────────────────── */
+    public function ipHistory(Request $request, Client $client): JsonResponse
+    {
+        if (! $request->user()?->isAdmin()) {
+            return response()->json(['message' => 'Solo un administrador puede ver el historial de IPs.'], 403);
+        }
+
+        $history = \App\Models\ClientIpHistory::where('client_id', $client->id)
+            ->with('assignedBy:id,name')
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        return response()->json($history);
     }
 
     /* ─────────────────────────────────────────────────────────
