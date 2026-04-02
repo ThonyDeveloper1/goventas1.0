@@ -25,14 +25,30 @@ jobs:
           git merge dev --no-ff -m "Auto-merge: dev → main [deploy]"
           git push origin main
 
-      # 3 — SSH al servidor y desplegar
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /var/www/gosistema
-            git pull origin main
-            bash deploy_ssh.sh
+      # 3 — Instalar cloudflared en el runner
+      - name: Install cloudflared
+        run: |
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+
+      # 4 — Configurar llave SSH
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      # 5 — Tunel TCP via Cloudflare + deploy
+      - name: Deploy via Cloudflare Tunnel SSH
+        run: |
+          # Abrir túnel TCP local: localhost:2222 → ssh.gofibra.pe:22
+          cloudflared access tcp --hostname ssh.gofibra.pe --url 127.0.0.1:2222 &
+          sleep 4
+
+          ssh -p 2222 \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            gouser@127.0.0.1 \
+            "cd /var/www/gosistema && git pull origin main && bash deploy_ssh.sh"
+
