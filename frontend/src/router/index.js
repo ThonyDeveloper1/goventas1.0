@@ -46,6 +46,12 @@ const routes = [
         meta: { roles: ['admin'] },
       },
       {
+        path: 'backup',
+        name: 'Backup',
+        component: () => import('@/views/admin/Backup.vue'),
+        meta: { roles: ['admin'] },
+      },
+      {
         path: 'admin/planes',
         name: 'AdminPlanes',
         component: () => import('@/views/admin/PlansManagement.vue'),

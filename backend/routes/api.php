@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InstallationController;
@@ -172,5 +173,13 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         Route::get('mikrotik/morosos-por-vendedora', [MikrotikIspController::class, 'morososPorVendedora']);
+
+        // ── Backup ──────────────────────────────────────────────────────
+        Route::prefix('backup')->group(function () {
+            Route::get('config',  [BackupController::class, 'getConfig']);
+            Route::post('config', [BackupController::class, 'saveConfig']);
+            Route::post('run',    [BackupController::class, 'runBackup']);
+            Route::get('logs',    [BackupController::class, 'getLogs']);
+        });
     });
 });

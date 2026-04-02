@@ -47,6 +47,7 @@ const navItems = computed(() => {
     { label: 'Reportes',        to: '/reportes',           icon: 'chart',    roles: ['admin'] },
     { label: 'Mapa',            to: '/reportes/mapa',      icon: 'map',      roles: ['admin'] },
     { label: 'Configuración',   to: '/configuracion',      icon: 'settings', roles: ['admin'] },
+    { label: 'Backup BD',        to: '/backup',             icon: 'database', roles: ['admin'] },
   ]
   return all.filter((item) => auth.hasRole(item.roles))
 })
@@ -219,6 +220,10 @@ function toggleGroup(key) {
         <!-- Settings -->
         <svg v-else-if="item.icon === 'settings'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+        <!-- Database / Backup -->
+        <svg v-else-if="item.icon === 'database'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3M4 7v5c0 1.657 3.582 3 8 3s8-1.343 8-3V7M4 7v5M4 12v5c0 1.657 3.582 3 8 3s8-1.343 8-3v-5" />
         </svg>
         <!-- Key / Credenciales -->
         <svg v-else-if="item.icon === 'key'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
