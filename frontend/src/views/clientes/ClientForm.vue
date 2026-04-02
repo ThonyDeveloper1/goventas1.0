@@ -1,4 +1,4 @@
-]633;E;head -n 140 "$FILE";d10cf179-3758-4aaf-8d9e-1bbb1100ebf5]633;C<script setup>
+<script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useClientsStore } from '@/store/clients'
@@ -27,6 +27,8 @@ const success  = ref('')
 const showSavedToast = ref(false)
 const photosSectionRef = ref(null)
 const uploadProgress = ref(0)
+const DEFAULT_LAT = '-13.160482'
+const DEFAULT_LNG = '-74.225823'
 
 const form = reactive({
   dni:          '',
@@ -39,8 +41,8 @@ const form = reactive({
   departamento: 'Ayacucho',
   provincia:    'Huamanga',
   distrito:     '',
-  latitud:      '',
-  longitud:     '',
+  latitud:      DEFAULT_LAT,
+  longitud:     DEFAULT_LNG,
   estado:       'pre_registro',
   plan_id:      '',
 })
@@ -107,9 +109,10 @@ async function syncGeolocationPermission() {
 
 function initLeafletMap() {
   if (!mapPickerContainer.value) return
+  const HUAMANGA_CENTER = [Number(DEFAULT_LAT), Number(DEFAULT_LNG)]
   const center = (form.latitud && form.longitud)
     ? [parseFloat(form.latitud), parseFloat(form.longitud)]
-    : [-12.0464, -77.0428]
+    : HUAMANGA_CENTER
   leafletMap = L.map(mapPickerContainer.value).setView(center, form.latitud ? 15 : 12)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -136,6 +139,20 @@ function placeLeafletMarker(latlng) {
     form.latitud  = e.target.getLatLng().lat.toFixed(7)
     form.longitud = e.target.getLatLng().lng.toFixed(7)
   })
+}
+
+function useDefaultCoordinates() {
+  form.latitud = DEFAULT_LAT
+  form.longitud = DEFAULT_LNG
+  delete errors.value.latitud
+  delete errors.value.longitud
+
+  if (!leafletMap) return
+
+  const pos = [Number(DEFAULT_LAT), Number(DEFAULT_LNG)]
+  leafletMap.invalidateSize()
+  leafletMap.setView(pos, 16)
+  placeLeafletMarker(pos)
 }
 
 async function getCurrentLocation() {
@@ -1296,7 +1313,7 @@ function validateClientForm() {
               v-model="form.latitud"
               type="number"
               step="any"
-              placeholder="-12.0464"
+              placeholder="-13.160482"
               required
               :class="['input font-mono text-sm', fieldError('latitud') ? 'border-red-400' : '']"
             />
@@ -1307,28 +1324,39 @@ function validateClientForm() {
               v-model="form.longitud"
               type="number"
               step="any"
-              placeholder="-77.0428"
+              placeholder="-74.225823"
               required
               :class="['input font-mono text-sm', fieldError('longitud') ? 'border-red-400' : '']"
             />
           </div>
         </div>
 
-        <button
-          type="button"
-          @click="getCurrentLocation"
-          :disabled="geoLoading"
-          class="flex items-center gap-2 text-sm text-primary font-medium hover:text-primary-700 disabled:opacity-50 transition-colors"
-        >
-          <svg v-if="!geoLoading" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          {{ geoLoading ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual' }}
-        </button>
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            @click="getCurrentLocation"
+            :disabled="geoLoading"
+            class="flex items-center gap-2 text-sm text-primary font-medium hover:text-primary-700 disabled:opacity-50 transition-colors"
+          >
+            <svg v-if="!geoLoading" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {{ geoLoading ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual' }}
+          </button>
+
+          <button
+            type="button"
+            @click="useDefaultCoordinates"
+            :disabled="geoLoading"
+            class="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            Ir a coordenadas por defecto
+          </button>
+        </div>
         <p v-if="geoError" class="text-red-500 text-xs mt-2">{{ geoError }}</p>
         <p v-else-if="fieldError('latitud') || fieldError('longitud')" class="text-red-500 text-xs mt-2">
           {{ fieldError('latitud') ?? fieldError('longitud') }}

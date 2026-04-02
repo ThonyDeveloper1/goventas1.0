@@ -166,14 +166,16 @@ class UserController extends Controller
 
     /**
      * DELETE /admin/users/{user}
-     * Soft-deactivate (toggle active=false) instead of hard delete.
+     * Hard-delete the user. If the user has assigned clients, a ?force=1 param
+     * is required (double-confirmation from the frontend). Clients are unassigned
+     * (user_id = null) before deletion to respect the FK constraint.
      */
     public function destroy(Request $request, User $user): JsonResponse
     {
         if (! $request->user()?->isAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Solo un administrador puede eliminar o desactivar usuarios.',
+                'message' => 'Solo un administrador puede eliminar usuarios.',
             ], 403);
         }
 
@@ -184,11 +186,27 @@ class UserController extends Controller
             ], 422);
         }
 
-        $user->update(['active' => false]);
+        $clientsCount = $user->clients()->count();
+
+        if ($clientsCount > 0 && ! $request->boolean('force')) {
+            return response()->json([
+                'success'        => false,
+                'requires_force' => true,
+                'clients_count'  => $clientsCount,
+                'message'        => "Este usuario tiene {$clientsCount} cliente(s) asignado(s). Confirma la eliminación para proceder.",
+            ], 409);
+        }
+
+        // Unassign clients before deleting to avoid the FK restrict
+        if ($clientsCount > 0) {
+            $user->clients()->update(['user_id' => null]);
+        }
+
+        $user->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Usuario desactivado correctamente.',
+            'message' => 'Usuario eliminado correctamente.',
         ]);
     }
 }

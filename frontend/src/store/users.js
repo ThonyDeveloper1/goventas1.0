@@ -46,11 +46,11 @@ export const useUsersStore = defineStore('users', () => {
     return data.data
   }
 
-  async function removeUser(id) {
-    await usersApi.remove(id)
+  async function removeUser(id, force = false) {
+    await usersApi.remove(id, force)
     const idx = items.value.findIndex(u => u.id === id)
     if (idx !== -1) {
-      items.value[idx] = { ...items.value[idx], active: false }
+      items.value.splice(idx, 1)
     }
     pagination.value.total--
   }

@@ -17,7 +17,7 @@ export default {
     return api.put(`/admin/users/${id}`, data)
   },
 
-  remove(id) {
-    return api.delete(`/admin/users/${id}`)
+  remove(id, force = false) {
+    return api.delete(`/admin/users/${id}`, { params: force ? { force: 1 } : {} })
   },
 }

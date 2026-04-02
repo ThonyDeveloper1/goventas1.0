@@ -124,21 +124,37 @@ async function toggleActive(user) {
   }
 }
 
-async function deactivateUser(user) {
+async function deleteUser(user) {
   if (!auth.isAdmin) {
-    alert('Solo un administrador puede eliminar o desactivar usuarios.')
+    alert('Solo un administrador puede eliminar usuarios.')
     return
   }
 
   if (user.id === auth.user?.id) {
-    alert('No puedes desactivar tu propia cuenta.')
+    alert('No puedes eliminar tu propia cuenta.')
     return
   }
-  if (!confirm(`¿Desactivar a ${user.name}? Ya no podrá iniciar sesión.`)) return
+
+  if (!confirm(`¿Eliminar permanentemente a "${user.name}"?\nEsta acción no se puede deshacer.`)) return
+
   try {
-    await store.removeUser(user.id)
+    await store.removeUser(user.id, false)
   } catch (e) {
-    alert(e.response?.data?.message ?? 'Error al desactivar.')
+    if (e.response?.status === 409 && e.response?.data?.requires_force) {
+      const count = e.response.data.clients_count
+      if (!confirm(
+        `⚠️ ATENCIÓN: "${user.name}" tiene ${count} cliente(s) asignado(s).\n\n` +
+        `Si lo eliminas, esos clientes quedarán sin vendedora asignada.\n\n` +
+        `¿Confirmas la eliminación permanente?`
+      )) return
+      try {
+        await store.removeUser(user.id, true)
+      } catch (e2) {
+        alert(e2.response?.data?.message ?? 'Error al eliminar.')
+      }
+    } else {
+      alert(e.response?.data?.message ?? 'Error al eliminar.')
+    }
   }
 }
 
@@ -306,13 +322,13 @@ onMounted(() => {
                     </svg>
                   </button>
                   <button
-                    v-if="auth.isAdmin && user.id !== auth.user?.id && user.active"
-                    @click="deactivateUser(user)"
+                    v-if="auth.isAdmin && user.id !== auth.user?.id"
+                    @click="deleteUser(user)"
                     class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    title="Desactivar"
+                    title="Eliminar usuario"
                   >
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
                 </div>
