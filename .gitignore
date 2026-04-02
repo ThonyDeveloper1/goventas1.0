@@ -4,6 +4,8 @@ backend/.env
 backend/.env.backup
 backend/storage/*.key
 backend/storage/debugbar/
+backend/storage/framework/views/
+backend/storage/app/public/clients/
 backend/public/hot
 backend/public/storage
 backend/bootstrap/cache/config.php
@@ -11,6 +13,10 @@ backend/bootstrap/cache/packages.php
 backend/bootstrap/cache/routes-v7.php
 backend/bootstrap/cache/services.php
 backend/.phpunit.result.cache
+
+# ── Scripts / Runtime ─────────────────────────────────────────────
+runtime/
+scripts/backups/
 
 # ── Frontend ─────────────────────────────────────────────────────
 frontend/node_modules/

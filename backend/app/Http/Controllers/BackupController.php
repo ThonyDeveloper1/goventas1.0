@@ -14,9 +14,9 @@ class BackupController extends Controller
 
     public function __construct()
     {
-        $this->configPath  = base_path('../../scripts/backup_config.json');
+        $this->configPath  = base_path('../scripts/backup_config.json');
         $this->logPath     = '/var/log/backup_db.log';
-        $this->scriptPath  = base_path('../../scripts/backup_db.sh');
+        $this->scriptPath  = base_path('../scripts/backup_db.sh');
         $this->msmtprcPath = '/home/gouser/.msmtprc';
     }
 
@@ -35,9 +35,7 @@ class BackupController extends Controller
     public function saveConfig(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'mail_from'     => 'required|email',
-            'mail_to'       => 'required|email',
-            'mail_password' => 'nullable|string|min:16|max:19',
+            'mail_to' => 'required|email',
         ]);
 
         if ($validator->fails()) {
@@ -47,11 +45,9 @@ class BackupController extends Controller
         $current = $this->readConfig();
 
         $config = [
-            'mail_from'     => $request->mail_from,
+            'mail_from'     => $current['mail_from']     ?? '',
             'mail_to'       => $request->mail_to,
-            'mail_password' => $request->filled('mail_password')
-                ? str_replace(' ', '', $request->mail_password)
-                : ($current['mail_password'] ?? ''),
+            'mail_password' => $current['mail_password'] ?? '',
         ];
 
         file_put_contents($this->configPath, json_encode($config, JSON_PRETTY_PRINT));

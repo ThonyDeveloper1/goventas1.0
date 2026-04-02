@@ -175,7 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('mikrotik/morosos-por-vendedora', [MikrotikIspController::class, 'morososPorVendedora']);
 
         // ── Backup ──────────────────────────────────────────────────────
-        Route::prefix('backup')->group(function () {
+        Route::prefix('admin/backup')->group(function () {
             Route::get('config',  [BackupController::class, 'getConfig']);
             Route::post('config', [BackupController::class, 'saveConfig']);
             Route::post('run',    [BackupController::class, 'runBackup']);
