@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 
@@ -9,12 +9,34 @@ defineEmits(['close'])
 const route = useRoute()
 const auth  = useAuthStore()
 
+// Track which group menus are expanded
+const expanded = ref({ clientes: false })
+
+// Auto-expand group when navigating to a child route
+watch(
+  () => route.path,
+  (path) => {
+    if (path.startsWith('/clientes')) expanded.value.clientes = true
+  },
+  { immediate: true }
+)
+
 const navItems = computed(() => {
   const all = [
     { label: 'Dashboard',       to: '/dashboard',          icon: 'grid',     roles: ['admin', 'vendedora', 'supervisor'] },
     { label: 'Usuarios',        to: '/admin/usuarios',     icon: 'users',    roles: ['admin'] },
     { label: 'Planes',          to: '/admin/planes',       icon: 'package',  roles: ['admin'] },
-    { label: 'Clientes',        to: '/clientes',           icon: 'person',   roles: ['admin', 'vendedora'] },
+    {
+      label: 'Clientes',
+      icon: 'person',
+      roles: ['admin', 'vendedora'],
+      group: 'clientes',
+      basePath: '/clientes',
+      children: [
+        { label: 'Registrar Cliente', to: '/clientes/nuevo', icon: 'plus-circle' },
+        { label: 'Lista de Clientes', to: '/clientes',       icon: 'list' },
+      ],
+    },
     { label: 'Instalaciones',   to: '/instalaciones',      icon: 'tool',     roles: ['admin', 'supervisor', 'vendedora'] },
     { label: 'Credenciales',    to: '/credenciales',       icon: 'key',      roles: ['admin', 'supervisor', 'vendedora'] },
     { label: 'Supervisiones',   to: '/supervisiones',      icon: 'clipboard',roles: ['admin', 'supervisor'] },
@@ -30,6 +52,14 @@ const navItems = computed(() => {
 
 function isActive(path) {
   return route.path === path || (path !== '/' && route.path.startsWith(path + '/'))
+}
+
+function isGroupActive(basePath) {
+  return route.path === basePath || route.path.startsWith(basePath + '/')
+}
+
+function toggleGroup(key) {
+  expanded.value[key] = !expanded.value[key]
 }
 </script>
 
@@ -75,18 +105,72 @@ function isActive(path) {
 
     <!-- ── Navigation ─────────────────────────────────────── -->
     <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.to"
-        :to="item.to"
-        @click="$emit('close')"
-        :class="[
-          'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-          isActive(item.to)
-            ? 'bg-primary text-white shadow-primary'
-            : 'text-gray-400 hover:text-white hover:bg-gray-800',
-        ]"
-      >
+      <template v-for="item in navItems" :key="item.to ?? item.group">
+
+        <!-- ── Group item (has children) ── -->
+        <template v-if="item.children">
+          <button
+            @click="toggleGroup(item.group)"
+            :class="[
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+              isGroupActive(item.basePath)
+                ? 'bg-primary/20 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800',
+            ]"
+          >
+            <!-- Person icon -->
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span class="flex-1 text-left">{{ item.label }}</span>
+            <!-- Chevron -->
+            <svg
+              :class="['w-4 h-4 flex-shrink-0 transition-transform duration-200', expanded[item.group] ? 'rotate-180' : '']"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Children submenu -->
+          <div v-show="expanded[item.group]" class="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
+            <RouterLink
+              v-for="child in item.children"
+              :key="child.to"
+              :to="child.to"
+              @click="$emit('close')"
+              :class="[
+                'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150',
+                route.path === child.to
+                  ? 'bg-primary text-white shadow-primary'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800',
+              ]"
+            >
+              <!-- plus-circle -->
+              <svg v-if="child.icon === 'plus-circle'" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <!-- list -->
+              <svg v-else-if="child.icon === 'list'" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              {{ child.label }}
+            </RouterLink>
+          </div>
+        </template>
+
+        <!-- ── Flat link ── -->
+        <RouterLink
+          v-else
+          :to="item.to"
+          @click="$emit('close')"
+          :class="[
+            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+            isActive(item.to)
+              ? 'bg-primary text-white shadow-primary'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800',
+          ]"
+        >
         <!-- Grid / Dashboard -->
         <svg v-if="item.icon === 'grid'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -94,10 +178,6 @@ function isActive(path) {
         <!-- Users -->
         <svg v-else-if="item.icon === 'users'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-        <!-- Person / Clients -->
-        <svg v-else-if="item.icon === 'person'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
         <!-- Package / Plans -->
         <svg v-else-if="item.icon === 'package'" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,7 +221,9 @@ function isActive(path) {
         </svg>
 
         {{ item.label }}
-      </RouterLink>
+        </RouterLink>
+
+      </template>
     </nav>
 
     <!-- ── Footer ─────────────────────────────────────────── -->
