@@ -60,6 +60,12 @@ const routes = [
         meta: { roles: ['admin', 'vendedora'] },
       },
       {
+        path: 'clientes/subir-venta',
+        name: 'SubirVenta',
+        component: () => import('@/views/clientes/ClientForm.vue'),
+        meta: { roles: ['admin'] },
+      },
+      {
         path: 'clientes/nuevo',
         name: 'ClienteNuevo',
         component: () => import('@/views/clientes/ClientForm.vue'),

@@ -28,8 +28,14 @@ class StoreClientRequest extends FormRequest
             'latitud'       => ['nullable', 'numeric', 'between:-90,90'],
             'longitud'      => ['nullable', 'numeric', 'between:-180,180'],
             // 'estado' is controlled by MikroTik sync — not editable via API
-            'plan_id'       => ['nullable', 'integer', 'exists:plans,id'],
-            'installacion_fecha' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
+            'plan_id'          => ['nullable', 'integer', 'exists:plans,id'],
+            'target_user_id'   => ['nullable', 'integer', 'exists:users,id'],
+            'fecha_registro'   => ['nullable', 'date'],
+            'installacion_fecha' => array_filter([
+                'nullable',
+                'date_format:Y-m-d',
+                $this->user()?->isAdmin() ? null : 'after_or_equal:today',
+            ]),
             'installacion_hora_inicio' => ['nullable', 'date_format:H:i'],
             'installacion_duracion' => ['nullable', 'integer', 'in:1,2'],
             'fotos'         => ['nullable', 'array', 'max:5'],

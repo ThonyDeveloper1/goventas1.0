@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth'
 import { useInstallationsStore } from '@/store/installations'
 import { usePlansStore } from '@/store/plans'
 import { resolvePhotoUrl } from '@/utils/photoUrl'
+import api from '@/services/api'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -19,7 +20,13 @@ const plansStore   = usePlansStore()
 /* ── Mode ───────────────────────────────────────────── */
 const isEdit  = computed(() => !!route.params.id)
 const isViewOnly = computed(() => !!route.params.id && !route.path.endsWith('/editar'))
-const title   = computed(() => isViewOnly.value ? 'Ver Cliente' : isEdit.value ? 'Editar Cliente' : 'Nuevo Cliente')
+const isAdminUpload = computed(() => route.path === '/clientes/subir-venta')
+const title   = computed(() => isAdminUpload.value ? 'Subir Venta' : isViewOnly.value ? 'Ver Cliente' : isEdit.value ? 'Editar Cliente' : 'Nuevo Cliente')
+
+/* ── Admin upload state ─────────────────────────────── */
+const adminUploadVendedora = ref('')
+const adminUploadFecha     = ref('')
+const vendedoraOptions     = ref([])
 
 /* ── Form state ─────────────────────────────────────── */
 const saving  = ref(false)
@@ -578,6 +585,13 @@ async function removeExistingPhoto(photo) {
 onMounted(async () => {
   plansStore.fetchPlans({ activo: true })
 
+  if (isAdminUpload.value) {
+    try {
+      const res = await api.get('/admin/users', { params: { role: 'vendedora', active: true, per_page: 200 } })
+      vendedoraOptions.value = res.data?.data ?? []
+    } catch (_) { /* non-critical */ }
+  }
+
   if (isEdit.value) {
     const client = await store.fetchClient(route.params.id)
     Object.keys(form).forEach((k) => {
@@ -647,6 +661,12 @@ async function handleSubmit() {
   photoError.value = ''
 
   if (!validateClientForm()) {
+    return
+  }
+
+  // Admin upload: vendedora required
+  if (isAdminUpload.value && !adminUploadVendedora.value) {
+    errors.value = { _global: ['Debes seleccionar una vendedora.'] }
     return
   }
 
@@ -720,6 +740,11 @@ async function handleSubmit() {
         payload.installacion_fecha = installDate.value
         payload.installacion_hora_inicio = installSlot.value
         payload.installacion_duracion = installDuration.value
+      }
+
+      if (isAdminUpload.value) {
+        payload.target_user_id = adminUploadVendedora.value
+        if (adminUploadFecha.value) payload.fecha_registro = adminUploadFecha.value
       }
 
       client = await store.createClient({ ...payload }, {
@@ -1124,6 +1149,40 @@ function validateClientForm() {
 
     <form @submit.prevent="handleSubmit" novalidate class="space-y-5">
 
+      <!-- ── Admin Upload Block ─────────────────────────── -->
+      <div v-if="isAdminUpload" class="card border-amber-200 bg-amber-50">
+        <h3 class="font-semibold text-amber-800 mb-4 flex items-center gap-2">
+          <span class="w-6 h-6 bg-amber-200 text-amber-800 rounded-lg flex items-center justify-center text-xs font-bold">★</span>
+          Datos de la venta (Admin)
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Vendedora selector -->
+          <div>
+            <label class="block text-sm font-medium text-amber-800 mb-1.5">Vendedora *</label>
+            <select v-model="adminUploadVendedora" class="input bg-white">
+              <option value="">Selecciona una vendedora</option>
+              <option v-for="v in vendedoraOptions" :key="v.id" :value="v.id">
+                {{ v.name }}
+              </option>
+            </select>
+            <p v-if="!adminUploadVendedora && errors._global" class="text-red-500 text-xs mt-1">
+              Selecciona una vendedora.
+            </p>
+          </div>
+          <!-- Fecha de registro -->
+          <div>
+            <label class="block text-sm font-medium text-amber-800 mb-1.5">Fecha de registro</label>
+            <input
+              v-model="adminUploadFecha"
+              type="date"
+              class="input bg-white"
+              placeholder="Dejar vacío = hoy"
+            />
+            <p class="text-amber-700 text-xs mt-1">Sin fecha = se usa la fecha actual.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- ── DNI ──────────────────────────────────────────── -->
       <div class="card">
         <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -1432,7 +1491,7 @@ function validateClientForm() {
             <input
               v-model="installDate"
               type="date"
-              :min="todayStr"
+              :min="isAdminUpload ? undefined : todayStr"
               class="input"
             />
           </div>
@@ -1814,7 +1873,7 @@ function validateClientForm() {
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          {{ saving ? 'Guardando...' : isEdit ? 'Actualizar Cliente' : 'Registrar Cliente' }}
+          {{ saving ? 'Guardando...' : isAdminUpload ? 'Subir Venta' : isEdit ? 'Actualizar Cliente' : 'Registrar Cliente' }}
         </button>
       </div>
 

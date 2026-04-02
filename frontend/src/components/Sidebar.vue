@@ -33,8 +33,9 @@ const navItems = computed(() => {
       group: 'clientes',
       basePath: '/clientes',
       children: [
-        { label: 'Registrar Cliente', to: '/clientes/nuevo', icon: 'plus-circle' },
-        { label: 'Lista de Clientes', to: '/clientes',       icon: 'list' },
+        { label: 'Registrar Cliente', to: '/clientes/nuevo',         icon: 'plus-circle' },
+        { label: 'Lista de Clientes', to: '/clientes',               icon: 'list' },
+        { label: 'Subir venta',       to: '/clientes/subir-venta',  icon: 'upload', adminOnly: true },
       ],
     },
     { label: 'Instalaciones',   to: '/instalaciones',      icon: 'tool',     roles: ['admin', 'supervisor', 'vendedora'] },
@@ -135,7 +136,7 @@ function toggleGroup(key) {
           <!-- Children submenu -->
           <div v-show="expanded[item.group]" class="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
             <RouterLink
-              v-for="child in item.children"
+              v-for="child in item.children.filter(c => !c.adminOnly || auth.isAdmin)"
               :key="child.to"
               :to="child.to"
               @click="$emit('close')"
@@ -153,6 +154,10 @@ function toggleGroup(key) {
               <!-- list -->
               <svg v-else-if="child.icon === 'list'" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <!-- upload -->
+              <svg v-else-if="child.icon === 'upload'" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               {{ child.label }}
             </RouterLink>

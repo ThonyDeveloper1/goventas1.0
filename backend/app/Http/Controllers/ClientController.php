@@ -108,21 +108,34 @@ class ClientController extends Controller
     {
         $data = $request->validated();
 
-        $installDate = $data['installacion_fecha'] ?? null;
-        $installStart = $data['installacion_hora_inicio'] ?? null;
+        $installDate     = $data['installacion_fecha']     ?? null;
+        $installStart    = $data['installacion_hora_inicio'] ?? null;
         $installDuration = (int) ($data['installacion_duracion'] ?? 0);
+        $targetUserId    = $data['target_user_id'] ?? null;
+        $fechaRegistro   = $data['fecha_registro']  ?? null;
 
-        unset($data['installacion_fecha'], $data['installacion_hora_inicio'], $data['installacion_duracion']);
+        unset(
+            $data['installacion_fecha'],
+            $data['installacion_hora_inicio'],
+            $data['installacion_duracion'],
+            $data['target_user_id'],
+            $data['fecha_registro']
+        );
 
         DB::beginTransaction();
         try {
             $client = Client::create([
                 ...$data,
                 'user_id' => $request->user()->isAdmin()
-                    ? ($data['user_id'] ?? $request->user()->id)
+                    ? ($targetUserId ?? $data['user_id'] ?? $request->user()->id)
                     : $request->user()->id,
                 'estado'  => 'pre_registro',
             ]);
+
+            // Admin can back-date or forward-date the registration timestamp
+            if ($fechaRegistro && $request->user()->isAdmin()) {
+                $client->updateQuietly(['created_at' => \Carbon\Carbon::parse($fechaRegistro)->startOfDay()]);
+            }
 
             if ($installDate && $installStart && in_array($installDuration, [1, 2], true)) {
                 $schedule = app(ScheduleService::class);
