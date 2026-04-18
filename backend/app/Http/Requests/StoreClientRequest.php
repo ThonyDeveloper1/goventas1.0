@@ -37,7 +37,7 @@ class StoreClientRequest extends FormRequest
                 $this->user()?->isAdmin() ? null : 'after_or_equal:today',
             ]),
             'installacion_hora_inicio' => ['nullable', 'date_format:H:i'],
-            'installacion_duracion' => ['nullable', 'integer', 'in:1,2'],
+            'installacion_duracion' => ['nullable', 'integer', 'in:1'],
             'fotos'         => ['nullable', 'array', 'max:5'],
             'fotos.*'       => ['image', 'mimes:jpeg,jpg,png,webp', 'max:4096'],
             'fotos_fachada' => ['nullable', 'array', 'max:5'],

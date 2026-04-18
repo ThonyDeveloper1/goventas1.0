@@ -18,7 +18,7 @@ class StoreInstallationRequest extends FormRequest
             'user_id'     => ['nullable', 'integer', 'exists:users,id'],
             'fecha'       => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'hora_inicio' => ['required', 'date_format:H:i'],
-            'duracion'    => ['required', 'integer', 'in:1,2'],
+            'duracion'    => ['required', 'integer', 'in:1'],
             'estado'      => ['sometimes', 'in:pendiente,en_proceso,completado'],
             'notas'       => ['nullable', 'string', 'max:500'],
         ];

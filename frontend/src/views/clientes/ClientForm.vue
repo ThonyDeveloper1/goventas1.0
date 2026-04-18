@@ -601,13 +601,11 @@ onMounted(async () => {
     })
     existingInstallation.value = client.latest_installation ?? null
     if (existingInstallation.value) {
-      installDate.value = existingInstallation.value.fecha ?? ''
-      const existingStart = String(existingInstallation.value.hora_inicio ?? '').slice(0, 5)
-      installDuration.value = Number(existingInstallation.value.duracion ?? 1)
-      if (installDate.value) {
-        await loadSlots()
-      }
-      installSlot.value = existingStart
+      // Mantener la instalación anterior solo como referencia visual.
+      // No precargamos fecha/hora para evitar sobrescribir un histórico de 2h al guardar.
+      installDate.value = ''
+      installSlot.value = ''
+      installDuration.value = 1
     }
     existingFotos.value = client.photos ?? []
   }
@@ -1393,6 +1391,24 @@ function validateClientForm() {
             Ir a coordenadas por defecto
           </button>
         </div>
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            @click="getCurrentLocation"
+            :disabled="geoLoading"
+            class="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/5 disabled:opacity-50 transition-colors"
+          >
+            <svg v-if="geoLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 10c0 5.25-7.5 11-7.5 11S4.5 15.25 4.5 10a7.5 7.5 0 1115 0z" />
+            </svg>
+            {{ geoLoading ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual' }}
+          </button>
+        </div>
         <p v-if="geoError" class="text-red-500 text-xs mt-2">{{ geoError }}</p>
         <p v-else-if="fieldError('latitud') || fieldError('longitud')" class="text-red-500 text-xs mt-2">
           {{ fieldError('latitud') ?? fieldError('longitud') }}
@@ -1406,7 +1422,7 @@ function validateClientForm() {
             </svg>
             Haz clic en el mapa para marcar la ubicación exacta, o arrastra el pin.
           </p>
-          <div ref="mapPickerContainer" class="map-picker-container w-full h-60 rounded-xl border border-gray-200 overflow-hidden shadow-sm"></div>
+          <div ref="mapPickerContainer" class="map-picker-container w-full h-72 sm:h-60 rounded-xl border border-gray-200 overflow-hidden shadow-sm"></div>
         </div>
       </div>
 
@@ -1502,7 +1518,7 @@ function validateClientForm() {
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Duración *</label>
             <div class="flex gap-2">
               <button
-                v-for="dur in [1, 2]"
+                v-for="dur in [1]"
                 :key="dur"
                 type="button"
                 @click="installDuration = dur"
@@ -1591,7 +1607,7 @@ function validateClientForm() {
           </svg>
           <div>
             <p class="text-sm font-medium text-green-800">Instalación programada</p>
-            <p class="text-xs text-green-600">{{ computedRange }} ({{ installDuration }}h)</p>
+            <p class="text-xs text-green-600">{{ computedRange }} (1h)</p>
           </div>
         </div>
 

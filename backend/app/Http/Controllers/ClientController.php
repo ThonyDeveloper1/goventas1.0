@@ -138,7 +138,7 @@ class ClientController extends Controller
                 $client->updateQuietly(['created_at' => \Carbon\Carbon::parse($fechaRegistro)->startOfDay()]);
             }
 
-            if ($installDate && $installStart && in_array($installDuration, [1, 2], true)) {
+            if ($installDate && $installStart && $installDuration === 1) {
                 $schedule = app(ScheduleService::class);
                 $horaFin = Installation::calcularHoraFin($installStart, $installDuration);
 
@@ -292,7 +292,7 @@ class ClientController extends Controller
         try {
             $client->update($data);
 
-            if ($installDate && $installStart && in_array($installDuration, [1, 2], true)) {
+            if ($installDate && $installStart && $installDuration === 1) {
                 $schedule = app(ScheduleService::class);
                 $horaFin = Installation::calcularHoraFin($installStart, $installDuration);
 
