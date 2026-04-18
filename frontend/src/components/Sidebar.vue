@@ -42,7 +42,7 @@ const navItems = computed(() => {
     { label: 'Credenciales',    to: '/credenciales',       icon: 'key',      roles: ['admin', 'supervisor', 'vendedora'] },
     { label: 'Supervisiones',   to: '/supervisiones',      icon: 'clipboard',roles: ['admin', 'supervisor'] },
     { label: 'Ventas Sospechosas', to: '/ventas-sospechosas', icon: 'shield', roles: ['admin'] },
-    { label: 'Reportes',        to: '/reportes',           icon: 'chart',    roles: ['admin'] },
+    { label: 'Reportes',        to: '/reportes',           icon: 'chart',    roles: ['admin'], exact: true },
     { label: 'Mapa',            to: '/reportes/mapa',      icon: 'map',      roles: ['admin'] },
     { label: 'Configuración',   to: '/configuracion',      icon: 'settings', roles: ['admin'] },
     { label: 'Backup BD',        to: '/backup',             icon: 'database', roles: ['admin'] },
@@ -50,7 +50,8 @@ const navItems = computed(() => {
   return all.filter((item) => auth.hasRole(item.roles))
 })
 
-function isActive(path) {
+function isActive(path, exact = false) {
+  if (exact) return route.path === path
   return route.path === path || (path !== '/' && route.path.startsWith(path + '/'))
 }
 
@@ -170,7 +171,7 @@ function toggleGroup(key) {
           @click="$emit('close')"
           :class="[
             'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-            isActive(item.to)
+            isActive(item.to, item.exact)
               ? 'bg-primary text-white shadow-primary'
               : 'text-gray-400 hover:text-white hover:bg-gray-800',
           ]"

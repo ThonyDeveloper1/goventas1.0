@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useSupervisionsStore } from '@/store/supervisions'
 import { useAuthStore } from '@/store/auth'
 import { resolvePhotoUrl } from '@/utils/photoUrl'
+import supervisionsApi from '@/services/supervisions'
 
 const router = useRouter()
 const route  = useRoute()
@@ -12,11 +13,21 @@ const auth   = useAuthStore()
 
 const sup        = computed(() => store.current)
 const uploading  = ref(false)
-const completing = ref(false)
-const starting   = ref(false)
+const savingChecklist = ref(false)
+const settingEstado   = ref(false)
 const comentario = ref('')
 const error      = ref('')
 const success    = ref('')
+
+/* ── Local checklist state ────────────────────────────── */
+const checklist = ref({
+  fachada_verificada:    false,
+  conexiones_verificadas: false,
+  ubicacion_confirmada:  false,
+  servicio_verificado:   false,
+  nivel_senal:           '',
+  notas_supervisor:      '',
+})
 
 /* ── Photo preview state ──────────────────────────────── */
 const pendingFiles   = ref([])   // File objects to upload
@@ -24,62 +35,75 @@ const pendingPreviews = ref([])  // { url, name }
 
 /* ── Load ─────────────────────────────────────────────── */
 onMounted(async () => {
-  await store.fetchSupervision(route.params.id)
+  await Promise.all([
+    store.fetchSupervision(route.params.id),
+    store.fetchEstados(),
+  ])
   if (sup.value) {
     comentario.value = sup.value.comentario ?? ''
+    checklist.value = {
+      fachada_verificada:    sup.value.fachada_verificada    ?? false,
+      conexiones_verificadas: sup.value.conexiones_verificadas ?? false,
+      ubicacion_confirmada:  sup.value.ubicacion_confirmada  ?? false,
+      servicio_verificado:   sup.value.servicio_verificado   ?? false,
+      nivel_senal:           sup.value.nivel_senal           ?? '',
+      notas_supervisor:      sup.value.notas_supervisor      ?? '',
+    }
   }
 })
 
 /* ── Estado helpers ───────────────────────────────────── */
-const ESTADOS = {
-  pendiente:  { label: 'Pendiente',  bg: 'bg-gray-100',   text: 'text-gray-600',  dot: 'bg-gray-400'  },
-  en_proceso: { label: 'En proceso', bg: 'bg-yellow-50',  text: 'text-yellow-700',dot: 'bg-yellow-400'},
-  completado: { label: 'Completado', bg: 'bg-green-50',   text: 'text-green-700', dot: 'bg-green-400' },
+function getEstadoBadge() {
+  if (!sup.value) return { label: '—', color: '#9CA3AF' }
+  const e = sup.value.estado_supervision
+  if (e) return { label: e.nombre, color: e.color }
+  const legacyMap = {
+    pendiente:  { label: 'Pendiente',  color: '#EAB308' },
+    en_proceso: { label: 'En proceso', color: '#3B82F6' },
+    completado: { label: 'Completado', color: '#16A34A' },
+  }
+  return legacyMap[sup.value.estado] ?? { label: sup.value.estado, color: '#9CA3AF' }
 }
 
-function eb(estado) { return ESTADOS[estado] || ESTADOS.pendiente }
-
-const canStart    = computed(() => sup.value?.estado === 'pendiente' && canAct.value)
-const canUpload   = computed(() => sup.value?.estado !== 'completado' && canAct.value)
-const canComplete = computed(() =>
-  sup.value?.estado !== 'completado'
-  && sup.value?.photos?.length > 0
-  && canAct.value
-)
 const canAct = computed(() => {
   if (!sup.value) return false
   return auth.isAdmin || sup.value.supervisor_id === auth.user?.id
 })
 
-/* ── Actions ──────────────────────────────────────────── */
-async function handleStart() {
-  error.value   = ''
-  starting.value = true
+const canUpload = computed(() => canAct.value)
+
+/* ── Set estado ───────────────────────────────────────── */
+async function handleSetEstado(estadoId) {
+  if (!canAct.value || settingEstado.value) return
+  error.value = ''
+  settingEstado.value = true
   try {
-    await store.startSupervision(sup.value.id)
-    success.value = 'Supervisión iniciada.'
+    await store.setEstado(sup.value.id, estadoId, comentario.value || null)
+    success.value = 'Estado actualizado.'
     await store.fetchSupervision(sup.value.id)
   } catch (e) {
-    error.value = e.response?.data?.errors?.estado?.[0] || e.response?.data?.message || 'Error al iniciar.'
+    error.value = e.response?.data?.message || 'Error al cambiar estado.'
   } finally {
-    starting.value = false
+    settingEstado.value = false
   }
 }
 
-async function handleComplete() {
-  error.value     = ''
-  completing.value = true
+/* ── Save checklist ───────────────────────────────────── */
+async function handleSaveChecklist() {
+  if (!canAct.value) return
+  error.value = ''
+  savingChecklist.value = true
   try {
-    await store.completeSupervision(sup.value.id, comentario.value || null)
-    success.value = 'Supervisión completada correctamente.'
+    await supervisionsApi.updateDetail(sup.value.id, {
+      ...checklist.value,
+      comentario: comentario.value || null,
+    })
     await store.fetchSupervision(sup.value.id)
+    success.value = 'Datos guardados.'
   } catch (e) {
-    const errs = e.response?.data?.errors
-    error.value = errs
-      ? Object.values(errs).flat().join(' ')
-      : e.response?.data?.message || 'Error al completar.'
+    error.value = e.response?.data?.message || 'Error al guardar.'
   } finally {
-    completing.value = false
+    savingChecklist.value = false
   }
 }
 
@@ -161,9 +185,12 @@ const lightboxUrl = ref(null)
             Supervisión #{{ sup.id }}
           </h1>
           <div class="flex items-center gap-2 mt-0.5">
-            <span :class="['px-2 py-0.5 rounded-full text-xs font-medium', eb(sup.estado).bg, eb(sup.estado).text]">
-              <span :class="['inline-block w-1.5 h-1.5 rounded-full mr-1', eb(sup.estado).dot]" />
-              {{ eb(sup.estado).label }}
+            <span
+              class="px-2 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1"
+              :style="getEstadoBadge().color ? { backgroundColor: getEstadoBadge().color + '22', color: getEstadoBadge().color } : {}"
+            >
+              <span class="w-1.5 h-1.5 rounded-full inline-block" :style="{ backgroundColor: getEstadoBadge().color }" />
+              {{ getEstadoBadge().label }}
             </span>
             <span class="text-xs text-gray-400">Supervisor: {{ sup.supervisor?.name }}</span>
           </div>
@@ -263,23 +290,92 @@ const lightboxUrl = ref(null)
         </div>
       </div>
 
-      <!-- ── ACTION: Iniciar supervisión ───────────────── -->
-      <div v-if="canStart" class="card mb-4">
-        <button
-          @click="handleStart"
-          :disabled="starting"
-          class="w-full py-4 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold text-lg transition-colors flex items-center justify-center gap-3"
-        >
-          <svg v-if="starting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
-          <svg v-else class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          {{ starting ? 'Iniciando...' : 'Iniciar Supervisión' }}
-        </button>
+      <!-- ── Checklist de verificación ───────────────── -->
+      <div v-if="canAct" class="card mb-4">
+        <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <span class="w-6 h-6 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xs font-bold">✓</span>
+          Lista de verificación
+        </h3>
+        <div class="space-y-3">
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <input type="checkbox" v-model="checklist.fachada_verificada" class="w-4 h-4 rounded accent-primary"/>
+            <span class="text-sm text-gray-700 group-hover:text-gray-900">Fachada verificada</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <input type="checkbox" v-model="checklist.conexiones_verificadas" class="w-4 h-4 rounded accent-primary"/>
+            <span class="text-sm text-gray-700 group-hover:text-gray-900">Conexiones verificadas</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <input type="checkbox" v-model="checklist.ubicacion_confirmada" class="w-4 h-4 rounded accent-primary"/>
+            <span class="text-sm text-gray-700 group-hover:text-gray-900">Ubicación confirmada</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <input type="checkbox" v-model="checklist.servicio_verificado" class="w-4 h-4 rounded accent-primary"/>
+            <span class="text-sm text-gray-700 group-hover:text-gray-900">Servicio activo en MikroTik</span>
+          </label>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Nivel de señal (dBm)</label>
+            <input v-model="checklist.nivel_senal" type="text" class="input text-sm" placeholder="-18 dBm" maxlength="50"/>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Notas del supervisor</label>
+            <textarea v-model="checklist.notas_supervisor" rows="3" class="input text-sm resize-none" placeholder="Observaciones, detalles adicionales..." maxlength="2000"/>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Comentario final</label>
+            <textarea v-model="comentario" rows="2" class="input text-sm resize-none" placeholder="Comentario de cierre (opcional)..." maxlength="1000"/>
+          </div>
+        </div>
+        <div class="flex justify-end mt-4">
+          <button
+            @click="handleSaveChecklist"
+            :disabled="savingChecklist"
+            class="btn-primary text-sm px-5 flex items-center gap-1.5"
+          >
+            <svg v-if="savingChecklist" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <span v-else>Guardar verificación</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Checklist read-only when no permission -->
+      <div v-else class="card mb-4">
+        <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <span class="w-6 h-6 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xs font-bold">✓</span>
+          Verificación
+        </h3>
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center gap-2">
+            <span :class="sup.fachada_verificada ? 'text-green-500' : 'text-gray-300'">{{ sup.fachada_verificada ? '✓' : '○' }}</span>
+            <span :class="sup.fachada_verificada ? 'text-gray-800' : 'text-gray-400'">Fachada verificada</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span :class="sup.conexiones_verificadas ? 'text-green-500' : 'text-gray-300'">{{ sup.conexiones_verificadas ? '✓' : '○' }}</span>
+            <span :class="sup.conexiones_verificadas ? 'text-gray-800' : 'text-gray-400'">Conexiones verificadas</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span :class="sup.ubicacion_confirmada ? 'text-green-500' : 'text-gray-300'">{{ sup.ubicacion_confirmada ? '✓' : '○' }}</span>
+            <span :class="sup.ubicacion_confirmada ? 'text-gray-800' : 'text-gray-400'">Ubicación confirmada</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span :class="sup.servicio_verificado ? 'text-green-500' : 'text-gray-300'">{{ sup.servicio_verificado ? '✓' : '○' }}</span>
+            <span :class="sup.servicio_verificado ? 'text-gray-800' : 'text-gray-400'">Servicio verificado</span>
+          </div>
+          <div v-if="sup.nivel_senal" class="text-gray-600">
+            <span class="font-medium">Señal:</span> {{ sup.nivel_senal }}
+          </div>
+        </div>
+        <div v-if="sup.notas_supervisor" class="mt-3 text-sm text-gray-600">
+          <p class="font-medium text-gray-700 mb-1">Notas:</p>
+          <p>{{ sup.notas_supervisor }}</p>
+        </div>
+        <div v-if="sup.comentario" class="mt-3 text-sm text-gray-600">
+          <p class="font-medium text-gray-700 mb-1">Comentario:</p>
+          <p>{{ sup.comentario }}</p>
+        </div>
       </div>
 
       <!-- ── Fotos de evidencia (supervision) ──────────── -->
@@ -297,7 +393,7 @@ const lightboxUrl = ref(null)
               <img :src="resolvePhotoUrl(photo)" :alt="`Evidencia ${photo.id}`" class="w-full h-full object-cover"/>
             </button>
             <button
-              v-if="canUpload && sup.estado !== 'completado'"
+              v-if="canUpload"
               @click.stop="handleDeletePhoto(photo.id)"
               class="absolute -top-1.5 -right-1.5 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow"
             >
@@ -349,48 +445,36 @@ const lightboxUrl = ref(null)
           </div>
         </div>
 
-        <!-- Warning: no photos for completion -->
-        <div v-if="sup.estado !== 'completado' && !sup.photos?.length && canAct" class="mt-3 flex gap-2 bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-xl px-3 py-2">
+        <!-- hint: no photos yet -->
+        <div v-if="!sup.photos?.length && canAct" class="mt-3 flex gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs rounded-xl px-3 py-2">
           <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.832c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-          Debe subir al menos una foto de evidencia antes de completar.
+          Agrega fotos de evidencia de la instalación.
         </div>
       </div>
 
-      <!-- ── ACTION: Completar supervisión ─────────────── -->
-      <div v-if="canComplete" class="card mb-4">
-        <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <span class="w-6 h-6 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-xs font-bold">✓</span>
-          Completar Supervisión
-        </h3>
-        <textarea
-          v-model="comentario"
-          rows="3"
-          placeholder="Comentario final (opcional)..."
-          class="input resize-none mb-3"
-          maxlength="1000"
-        />
-        <button
-          @click="handleComplete"
-          :disabled="completing"
-          class="w-full py-4 rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold text-lg transition-colors flex items-center justify-center gap-3"
-        >
-          <svg v-if="completing" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
-          <svg v-else class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-          </svg>
-          {{ completing ? 'Completando...' : 'Marcar como Completado' }}
-        </button>
-      </div>
-
-      <!-- ── Comentario (if completed) ─────────────────── -->
-      <div v-if="sup.estado === 'completado' && sup.comentario" class="card mb-4">
-        <h3 class="font-semibold text-gray-800 mb-2 text-sm">Comentario del supervisor</h3>
-        <p class="text-gray-600 text-sm">{{ sup.comentario }}</p>
+      <!-- ── Estado pills — sticky footer ─────────────── -->
+      <div v-if="canAct && store.estados.length" class="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-lg px-4 py-3">
+        <p class="text-xs text-gray-500 mb-2 font-medium">Cambiar estado:</p>
+        <div class="flex gap-2 flex-wrap">
+          <button
+            v-for="e in store.estados"
+            :key="e.id"
+            @click="handleSetEstado(e.id)"
+            :disabled="settingEstado"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all disabled:opacity-60"
+            :style="(sup.estado_id === e.id || sup.estado_supervision?.id === e.id)
+              ? { backgroundColor: e.color, color: '#fff', borderColor: e.color }
+              : { backgroundColor: e.color + '22', color: e.color, borderColor: e.color + '55' }"
+          >
+            <svg v-if="settingEstado" class="w-3 h-3 animate-spin inline mr-1" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            {{ e.nombre }}
+          </button>
+        </div>
       </div>
 
     </template>

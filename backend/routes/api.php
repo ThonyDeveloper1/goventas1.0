@@ -14,6 +14,7 @@ use App\Http\Controllers\PlanController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupervisionController;
+use App\Http\Controllers\SupervisionEstadoController;
 use App\Http\Controllers\SuspiciousSaleController;
 use Illuminate\Support\Facades\Route;
 
@@ -107,14 +108,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Supervisions (Admin + Supervisor) ────────────────────────────────
     Route::middleware('role:admin,supervisor')->group(function () {
-        Route::get('supervisions/supervisors', [SupervisionController::class, 'supervisors']);
-        Route::get('supervisions',            [SupervisionController::class, 'index']);
-        Route::get('supervisions/{id}',       [SupervisionController::class, 'show']);
-        Route::post('supervisions/assign',    [SupervisionController::class, 'assign']);
-        Route::post('supervisions/{id}/start',    [SupervisionController::class, 'start']);
-        Route::post('supervisions/{id}/complete', [SupervisionController::class, 'complete']);
-        Route::post('supervisions/{id}/photos',   [SupervisionController::class, 'uploadPhotos']);
+        Route::get('supervisions/supervisors',            [SupervisionController::class, 'supervisors']);
+        Route::get('supervisions/tickets',                [SupervisionController::class, 'tickets']);
+        Route::get('supervisions',                        [SupervisionController::class, 'index']);
+        Route::get('supervisions/{id}',                   [SupervisionController::class, 'show']);
+        Route::post('supervisions/assign',                [SupervisionController::class, 'assign']);
+        Route::patch('supervisions/{id}',                 [SupervisionController::class, 'update']);
+        Route::post('supervisions/{id}/estado',           [SupervisionController::class, 'setState']);
+        Route::post('supervisions/{id}/start',            [SupervisionController::class, 'start']);
+        Route::post('supervisions/{id}/complete',         [SupervisionController::class, 'complete']);
+        Route::post('supervisions/{id}/photos',           [SupervisionController::class, 'uploadPhotos']);
         Route::delete('supervisions/{id}/photos/{photoId}', [SupervisionController::class, 'destroyPhoto']);
+        // Estados: read-only for supervisors
+        Route::get('supervisions/estados',                [SupervisionEstadoController::class, 'index']);
+    });
+    // Estados: full CRUD for admin only
+    Route::middleware('role:admin')->group(function () {
+        Route::post('supervisions/estados',               [SupervisionEstadoController::class, 'store']);
+        Route::put('supervisions/estados/{id}',           [SupervisionEstadoController::class, 'update']);
+        Route::delete('supervisions/estados/{id}',        [SupervisionEstadoController::class, 'destroy']);
     });
 
     // ── Notifications (all authenticated) ──────────────────────────────
