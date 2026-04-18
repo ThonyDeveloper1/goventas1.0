@@ -10,6 +10,8 @@ import api from '@/services/api'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || ''
+
 const router = useRouter()
 const route  = useRoute()
 const store  = useClientsStore()
@@ -86,11 +88,48 @@ watch(() => form.dni, () => { dniError.value = '' })
 const geoLoading = ref(false)
 const geoError   = ref('')
 const geoPermissionState = ref('unknown') // unknown | granted | denied | prompt
+const mapLayerMode = ref('street')
+const mapLayerError = ref('')
 const geoSectionRef = ref(null)
 const mapPickerContainer = ref(null)
 let   leafletMap    = null
 let   leafletMarker = null
+let   leafletStreetLayer = null
+let   leafletSatelliteLayer = null
+let   googleMap     = null
+let   googleMarker  = null
 let   geoPermissionStatus = null
+let   satelliteSourceIndex = 0
+let   satelliteTileErrorCount = 0
+
+const STREET_LAYER = {
+  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  options: {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  },
+}
+
+const SATELLITE_LAYER_SOURCES = [
+  {
+    type: 'tile',
+    url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    options: {
+      attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
+      maxZoom: 17,
+      maxNativeZoom: 17,
+    },
+  },
+  {
+    type: 'tile',
+    url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg',
+    options: {
+      attribution: 'Imagery © Sentinel-2 via EOX',
+      maxZoom: 14,
+      maxNativeZoom: 14,
+    },
+  },
+]
 
 function hasValidCoordinates() {
   const lat = Number(form.latitud)
@@ -122,16 +161,218 @@ function initLeafletMap() {
     ? [parseFloat(form.latitud), parseFloat(form.longitud)]
     : HUAMANGA_CENTER
   leafletMap = L.map(mapPickerContainer.value).setView(center, form.latitud ? 15 : 12)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19,
-  }).addTo(leafletMap)
+  leafletStreetLayer = L.tileLayer(STREET_LAYER.url, STREET_LAYER.options)
+  leafletSatelliteLayer = createSatelliteLayerByIndex(satelliteSourceIndex)
+  setMapLayer(mapLayerMode.value)
   if (form.latitud && form.longitud) placeLeafletMarker(center)
   leafletMap.on('click', (e) => {
     form.latitud  = e.latlng.lat.toFixed(7)
     form.longitud = e.latlng.lng.toFixed(7)
     placeLeafletMarker([e.latlng.lat, e.latlng.lng])
   })
+}
+
+function initGoogleMap() {
+  if (!mapPickerContainer.value || !window.google?.maps) return
+
+  const HUAMANGA_CENTER = { lat: Number(DEFAULT_LAT), lng: Number(DEFAULT_LNG) }
+  const center = (form.latitud && form.longitud)
+    ? { lat: parseFloat(form.latitud), lng: parseFloat(form.longitud) }
+    : HUAMANGA_CENTER
+
+  googleMap = new window.google.maps.Map(mapPickerContainer.value, {
+    center,
+    zoom: form.latitud ? 18 : 15,
+    mapTypeId: mapLayerMode.value === 'satellite' ? 'hybrid' : 'roadmap',
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true,
+    gestureHandling: 'greedy',
+  })
+
+  googleMap.addListener('click', (e) => {
+    const lat = Number(e.latLng.lat()).toFixed(7)
+    const lng = Number(e.latLng.lng()).toFixed(7)
+    form.latitud = lat
+    form.longitud = lng
+    placeGoogleMarker({ lat: Number(lat), lng: Number(lng) })
+  })
+
+  if (form.latitud && form.longitud) {
+    placeGoogleMarker({ lat: parseFloat(form.latitud), lng: parseFloat(form.longitud) })
+  }
+}
+
+function loadGoogleMaps() {
+  return new Promise((resolve) => {
+    if (window.google?.maps) {
+      resolve()
+      return
+    }
+
+    if (!GOOGLE_MAPS_KEY) {
+      resolve(false)
+      return
+    }
+
+    const existing = document.getElementById('google-maps-js-client-form')
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener('error', () => resolve(false), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'google-maps-js-client-form'
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_KEY)}&libraries=marker`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => resolve(false)
+    document.head.appendChild(script)
+  })
+}
+
+function createSatelliteLayerByIndex(index) {
+  const source = SATELLITE_LAYER_SOURCES[index] ?? SATELLITE_LAYER_SOURCES[0]
+  const layer = source.type === 'wms'
+    ? L.tileLayer.wms(source.url, source.options)
+    : L.tileLayer(source.url, source.options)
+  layer.on('tileerror', () => {
+    if (mapLayerMode.value !== 'satellite') return
+
+    satelliteTileErrorCount += 1
+    if (satelliteTileErrorCount < 4) return
+
+    if (satelliteSourceIndex < SATELLITE_LAYER_SOURCES.length - 1) {
+      satelliteSourceIndex += 1
+      satelliteTileErrorCount = 0
+      leafletSatelliteLayer = createSatelliteLayerByIndex(satelliteSourceIndex)
+      setMapLayer('satellite')
+      mapLayerError.value = 'Satelite HD no disponible en esta red. Cambiamos a Sentinel global (menor nitidez).'
+      return
+    }
+
+    mapLayerError.value = 'No se pudo cargar el modo satelite en esta red. Mostrando modo calle.'
+    setMapLayer('street')
+  })
+  return layer
+}
+
+function refreshMapSize() {
+  requestAnimationFrame(() => {
+    if (googleMap && window.google?.maps) {
+      window.google.maps.event.trigger(googleMap, 'resize')
+      return
+    }
+
+    if (leafletMap) {
+      leafletMap.invalidateSize()
+    }
+  })
+}
+
+function syncMapZoomForLayer() {
+  if (!leafletMap) return
+
+  if (mapLayerMode.value === 'satellite') {
+    const source = SATELLITE_LAYER_SOURCES[satelliteSourceIndex] ?? SATELLITE_LAYER_SOURCES[0]
+    const sourceMaxZoom = Number(source?.options?.maxNativeZoom ?? source?.options?.maxZoom ?? 17)
+    leafletMap.setMaxZoom(sourceMaxZoom)
+    if (leafletMap.getZoom() > sourceMaxZoom) {
+      leafletMap.setZoom(sourceMaxZoom)
+    }
+    return
+  }
+
+  leafletMap.setMaxZoom(19)
+}
+
+function activateSatelliteLayer() {
+  if (!leafletMap && !googleMap) return
+
+  // Start with HD imagery every time user selects satellite.
+  if (satelliteSourceIndex !== 0) {
+    satelliteSourceIndex = 0
+    satelliteTileErrorCount = 0
+    leafletSatelliteLayer = createSatelliteLayerByIndex(satelliteSourceIndex)
+  }
+
+  setMapLayer('satellite')
+}
+
+function setMapLayer(mode) {
+  mapLayerMode.value = mode === 'satellite' ? 'satellite' : 'street'
+  satelliteTileErrorCount = 0
+
+  if (googleMap && window.google?.maps) {
+    googleMap.setMapTypeId(mapLayerMode.value === 'satellite' ? 'hybrid' : 'roadmap')
+    mapLayerError.value = ''
+    refreshMapSize()
+    return
+  }
+
+  if (!leafletMap || !leafletStreetLayer || !leafletSatelliteLayer) return
+
+  if (leafletMap.hasLayer(leafletStreetLayer)) leafletMap.removeLayer(leafletStreetLayer)
+  if (leafletMap.hasLayer(leafletSatelliteLayer)) leafletMap.removeLayer(leafletSatelliteLayer)
+
+  if (mapLayerMode.value === 'satellite') {
+    mapLayerError.value = ''
+    leafletSatelliteLayer.addTo(leafletMap)
+    syncMapZoomForLayer()
+    refreshMapSize()
+    return
+  }
+
+  mapLayerError.value = ''
+  leafletStreetLayer.addTo(leafletMap)
+  syncMapZoomForLayer()
+  refreshMapSize()
+}
+
+function placeGoogleMarker(latlng) {
+  if (!googleMap || !window.google?.maps) return
+
+  if (googleMarker) {
+    googleMarker.setMap(null)
+  }
+
+  googleMarker = new window.google.maps.Marker({
+    position: latlng,
+    map: googleMap,
+    draggable: true,
+  })
+
+  googleMarker.addListener('dragend', (e) => {
+    const lat = Number(e.latLng.lat()).toFixed(7)
+    const lng = Number(e.latLng.lng()).toFixed(7)
+    form.latitud = lat
+    form.longitud = lng
+  })
+}
+
+function placeMarker(latlng) {
+  if (googleMap && window.google?.maps) {
+    placeGoogleMarker({ lat: latlng[0], lng: latlng[1] })
+    return
+  }
+
+  placeLeafletMarker(latlng)
+}
+
+function updateMapPosition(pos, zoom = 16) {
+  if (googleMap && window.google?.maps) {
+    googleMap.setCenter({ lat: pos[0], lng: pos[1] })
+    googleMap.setZoom(zoom)
+    refreshMapSize()
+    return
+  }
+
+  if (leafletMap) {
+    leafletMap.invalidateSize()
+    leafletMap.setView(pos, zoom)
+  }
 }
 
 function placeLeafletMarker(latlng) {
@@ -155,12 +396,11 @@ function useDefaultCoordinates() {
   delete errors.value.latitud
   delete errors.value.longitud
 
-  if (!leafletMap) return
+  if (!leafletMap && !googleMap) return
 
   const pos = [Number(DEFAULT_LAT), Number(DEFAULT_LNG)]
-  leafletMap.invalidateSize()
-  leafletMap.setView(pos, 16)
-  placeLeafletMarker(pos)
+  updateMapPosition(pos, 16)
+  placeMarker(pos)
 }
 
 async function getCurrentLocation() {
@@ -178,12 +418,9 @@ async function getCurrentLocation() {
     delete errors.value.longitud
     geoLoading.value = false
 
-    if (leafletMap) {
-      const pos = [parseFloat(form.latitud), parseFloat(form.longitud)]
-      leafletMap.invalidateSize()
-      leafletMap.setView(pos, zoom)
-      placeLeafletMarker(pos)
-    }
+    const pos = [parseFloat(form.latitud), parseFloat(form.longitud)]
+    updateMapPosition(pos, zoom)
+    placeMarker(pos)
   }
 
   const fetchIpCoords = async () => {
@@ -612,20 +849,38 @@ onMounted(async () => {
 
   await syncGeolocationPermission()
 
-  // Initialize Leaflet map (OpenStreetMap — no API key needed)
-  setTimeout(() => initLeafletMap(), 50)
+  const googleLoaded = await loadGoogleMaps()
+
+  if (googleLoaded && window.google?.maps) {
+    initGoogleMap()
+  } else {
+    // Fallback seguro: Leaflet para no romper tu localhost si no hay key.
+    setTimeout(() => initLeafletMap(), 50)
+  }
 
   // Auto-request location when opening the form for a new client.
   if (!isEdit.value && !hasValidCoordinates()) {
     getCurrentLocation()
   }
 
+  window.addEventListener('resize', refreshMapSize)
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', refreshMapSize)
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  if (googleMarker) {
+    googleMarker.setMap(null)
+    googleMarker = null
+  }
+  if (googleMap && window.google?.maps) {
+    window.google.maps.event.clearInstanceListeners(googleMap)
+    googleMap = null
+  }
   if (leafletMap) { leafletMap.remove(); leafletMap = null }
+  leafletStreetLayer = null
+  leafletSatelliteLayer = null
   closeCamera()
   clearNewPhotos()
 })
@@ -1410,12 +1665,39 @@ function validateClientForm() {
           </button>
         </div>
         <p v-if="geoError" class="text-red-500 text-xs mt-2">{{ geoError }}</p>
+        <p v-else-if="mapLayerError" class="text-amber-600 text-xs mt-2">{{ mapLayerError }}</p>
         <p v-else-if="fieldError('latitud') || fieldError('longitud')" class="text-red-500 text-xs mt-2">
           {{ fieldError('latitud') ?? fieldError('longitud') }}
         </p>
 
-        <!-- Leaflet map picker (OpenStreetMap — no API key needed) -->
+        <!-- Leaflet map picker (OpenStreetMap + Esri Satellite — no API key needed) -->
         <div class="mt-4">
+          <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 mb-2 shadow-sm">
+            <button
+              type="button"
+              @click="setMapLayer('street')"
+              :class="[
+                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                mapLayerMode === 'street'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-600 hover:bg-gray-100',
+              ]"
+            >
+              Calle
+            </button>
+            <button
+              type="button"
+              @click="activateSatelliteLayer"
+              :class="[
+                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                mapLayerMode === 'satellite'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-600 hover:bg-gray-100',
+              ]"
+            >
+              Satélite
+            </button>
+          </div>
           <p class="text-xs text-gray-500 mb-2 flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
