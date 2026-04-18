@@ -26,10 +26,18 @@ const routes = [
         component: () => import('@/views/Dashboard.vue'),
       },
       {
-        path: 'credenciales',
-        name: 'Credenciales',
-        component: () => import('@/views/Credenciales.vue'),
+        path: 'updatehub',
+        name: 'UpdateHub',
+         component: () => import('@/views/UpdateHub.vue'),
         meta: { roles: ['admin', 'vendedora', 'supervisor'] },
+      },
+      {
+        path: 'ajustes-updatehub',
+        redirect: '/updatehub',
+      },
+      {
+        path: 'credenciales',
+        redirect: '/updatehub',
       },
 
       /* Admin */

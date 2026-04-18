@@ -26,6 +26,7 @@ class Client extends Model
         'latitud',
         'longitud',
         'estado',
+        'cliente_estado_id',
         'fecha_vencimiento',
         'user_id',
         'mikrotik_user',
@@ -83,6 +84,11 @@ class Client extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function clienteEstado(): BelongsTo
+    {
+        return $this->belongsTo(ClientEstado::class, 'cliente_estado_id');
     }
 
     public function mikrotikRouter(): BelongsTo

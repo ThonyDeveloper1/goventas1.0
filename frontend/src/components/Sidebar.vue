@@ -39,7 +39,7 @@ const navItems = computed(() => {
       ],
     },
     { label: 'Instalaciones',   to: '/instalaciones',      icon: 'tool',     roles: ['admin', 'supervisor', 'vendedora'] },
-    { label: 'Credenciales',    to: '/credenciales',       icon: 'key',      roles: ['admin', 'supervisor', 'vendedora'] },
+    { label: 'UpdateHub', to: '/updatehub', icon: 'key',      roles: ['admin', 'supervisor', 'vendedora'] },
     { label: 'Supervisiones',   to: '/supervisiones',      icon: 'clipboard',roles: ['admin', 'supervisor'] },
     { label: 'Ventas Sospechosas', to: '/ventas-sospechosas', icon: 'shield', roles: ['admin'] },
     { label: 'Reportes',        to: '/reportes',           icon: 'chart',    roles: ['admin'], exact: true },

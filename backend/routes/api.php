@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ClientEstadoController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\ClientController;
@@ -97,6 +98,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Plans management
         Route::apiResource('plans', PlanController::class)->except('index');
+
+        // Client Estados management
+        Route::get('client-estados', [ClientEstadoController::class, 'index']);
+        Route::post('client-estados', [ClientEstadoController::class, 'store']);
+        Route::get('client-estados/{estado}', [ClientEstadoController::class, 'show']);
+        Route::put('client-estados/{estado}', [ClientEstadoController::class, 'update']);
+        Route::delete('client-estados/{estado}', [ClientEstadoController::class, 'destroy']);
     });
 
     // ── Installations (Admin + Supervisor + Vendedora) ───────────────────

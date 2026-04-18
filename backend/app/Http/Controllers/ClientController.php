@@ -38,6 +38,7 @@ class ClientController extends Controller
             ->with([
                 'vendedora:id,name',
                 'plan:id,nombre,velocidad_bajada,velocidad_subida,precio',
+                'clienteEstado:id,nombre,color,orden,sistema_protegido',
                 'latestInstallation',
             ])
             ->forUser($user);
@@ -192,6 +193,7 @@ class ClientController extends Controller
             'vendedora:id,name',
             'photos',
             'plan:id,nombre,velocidad_bajada,velocidad_subida,precio',
+            'clienteEstado:id,nombre,color,orden,sistema_protegido',
             'latestInstallation',
         ]);
         $client->photos->each(fn ($p) => $p->append('url'));
@@ -222,6 +224,7 @@ class ClientController extends Controller
             'vendedora:id,name',
             'photos',
             'plan:id,nombre,velocidad_bajada,velocidad_subida,precio',
+            'clienteEstado:id,nombre,color,orden,sistema_protegido',
             'latestInstallation',
         ]);
         $client->photos->each(fn ($p) => $p->append('url'));
@@ -370,15 +373,34 @@ class ClientController extends Controller
             ], 403);
         }
 
-        $validated = $request->validate([
-            'estado' => ['required', 'in:pre_registro,en_proceso,finalizada,suspendido,baja'],
-        ]);
+        // Validar: puede ser nombre de estado legacy (enum) o ID de estado dinámico.
+        $statusInput = $request->input('estado');
 
-        $client->update([
-            'estado' => $validated['estado'],
-        ]);
+        // Primero, checar si es un nombre de estado viejo (para compatibilidad)
+        $estadosLegacy = ['pre_registro', 'en_proceso', 'finalizada', 'suspendido', 'baja'];
+        if (in_array($statusInput, $estadosLegacy)) {
+            $estadoDinamico = \App\Models\ClientEstado::where('nombre', $statusInput)->first();
+
+            $client->update([
+                'estado' => $statusInput,
+                'cliente_estado_id' => $estadoDinamico?->id,
+            ]);
+        } else {
+            // Si no es un estado legacy, debe ser un ID de ClientEstado
+            $validated = $request->validate([
+                'estado' => ['required', 'integer', 'exists:cliente_estados,id'],
+            ]);
+
+            $estadoDinamico = \App\Models\ClientEstado::find($validated['estado']);
+            $client->update([
+                'cliente_estado_id' => $estadoDinamico?->id,
+                // Mantener columna legacy sincronizada durante la transición gradual.
+                'estado' => $estadoDinamico?->nombre ?? $client->estado,
+            ]);
+        }
 
         $client->refresh();
+        $client->load('clienteEstado:id,nombre,color,orden,sistema_protegido');
         $client->append('nombre_completo');
         $client->setAttribute('estado_comercial', $this->resolveCommercialState($client));
 
@@ -747,6 +769,14 @@ class ClientController extends Controller
 
     private function resolveCommercialState(Client $client): string
     {
+        if ($client->relationLoaded('clienteEstado') && $client->clienteEstado) {
+            return (string) $client->clienteEstado->nombre;
+        }
+
+        if (filled($client->estado_comercial)) {
+            return (string) $client->estado_comercial;
+        }
+
         if ($client->estado === 'baja') {
             return 'baja';
         }
@@ -767,7 +797,7 @@ class ClientController extends Controller
             return 'finalizada';
         }
 
-        return 'pre_registro';
+        return filled($client->estado) ? (string) $client->estado : 'pre_registro';
     }
 
     /**

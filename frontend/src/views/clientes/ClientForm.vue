@@ -732,6 +732,7 @@ async function handleSubmit() {
       clearNewPhotos()
       uploadProgress.value = 100
       success.value = 'Cambios guardados correctamente.'
+      await store.fetchClients(store.pagination.current_page)
       setTimeout(() => {
         router.push('/clientes')
       }, 500)

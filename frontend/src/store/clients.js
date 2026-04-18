@@ -82,7 +82,8 @@ export const useClientsStore = defineStore('clients', () => {
 
   async function updateClient(id, formData, fotos = [], options = {}) {
     const { data } = await clientsApi.update(id, formData, fotos, options)
-    const idx = items.value.findIndex((c) => c.id === id)
+    const numericId = Number(id)
+    const idx = items.value.findIndex((c) => c.id === numericId)
     if (idx !== -1) items.value[idx] = data.data
     current.value = data.data
     return data.data
@@ -90,7 +91,8 @@ export const useClientsStore = defineStore('clients', () => {
 
   async function removeClient(id) {
     const { data } = await clientsApi.remove(id)
-    items.value = items.value.filter((c) => c.id !== id)
+    const numericId = Number(id)
+    items.value = items.value.filter((c) => c.id !== numericId)
     pagination.value.total--
     return data
   }
@@ -98,9 +100,10 @@ export const useClientsStore = defineStore('clients', () => {
   async function updateClientStatus(id, estado) {
     const { data } = await clientsApi.updateStatus(id, estado)
     const updatedClient = data?.data
+    const numericId = Number(id)
 
     if (updatedClient) {
-      const idx = items.value.findIndex((c) => c.id === id)
+      const idx = items.value.findIndex((c) => c.id === numericId)
       if (idx !== -1) {
         items.value[idx] = {
           ...items.value[idx],
@@ -108,7 +111,7 @@ export const useClientsStore = defineStore('clients', () => {
         }
       }
 
-      if (current.value?.id === id) {
+      if (current.value?.id === numericId) {
         current.value = {
           ...current.value,
           ...updatedClient,
