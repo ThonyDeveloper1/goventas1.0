@@ -17,7 +17,7 @@ class UpdateInstallationRequest extends FormRequest
             'client_id'   => ['sometimes', 'integer', 'exists:clients,id'],
             'fecha'       => ['sometimes', 'date_format:Y-m-d'],
             'hora_inicio' => ['sometimes', 'date_format:H:i'],
-            'duracion'    => ['nullable', 'integer', 'in:1'],
+            'duracion'    => ['nullable', 'integer', 'in:1,2'],
             'estado'      => ['sometimes', 'in:pendiente,en_proceso,completado'],
             'notas'       => ['nullable', 'string', 'max:500'],
         ];

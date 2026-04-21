@@ -26,18 +26,10 @@ const routes = [
         component: () => import('@/views/Dashboard.vue'),
       },
       {
-        path: 'updatehub',
-        name: 'UpdateHub',
-         component: () => import('@/views/UpdateHub.vue'),
-        meta: { roles: ['admin', 'vendedora', 'supervisor'] },
-      },
-      {
-        path: 'ajustes-updatehub',
-        redirect: '/updatehub',
-      },
-      {
         path: 'credenciales',
-        redirect: '/updatehub',
+        name: 'Credenciales',
+        component: () => import('@/views/Credenciales.vue'),
+        meta: { roles: ['admin', 'vendedora', 'supervisor'] },
       },
 
       /* Admin */
@@ -130,6 +122,20 @@ const routes = [
         name: 'SupervisionDetalle',
         component: () => import('@/views/supervisiones/SupervisionDetail.vue'),
         meta: { roles: ['admin', 'supervisor'] },
+      },
+
+      /* ── Network / MikroTik ─────────────────────────────────── */
+      {
+        path: 'red',
+        name: 'EstadoRed',
+        component: () => import('@/views/red/NetworkStatus.vue'),
+        meta: { roles: ['admin'] },
+      },
+      {
+        path: 'red/morosos',
+        name: 'CortesMorosos',
+        component: () => import('@/views/red/CortesMorosos.vue'),
+        meta: { roles: ['admin'] },
       },
 
       /* ── Suspicious Sales / Fraud Detection ───────────────── */

@@ -30,7 +30,6 @@ const vendorOptions = ref([])
 const selectedMonth = ref(new Date().toISOString().slice(0, 7))
 const allMonths = ref(true)
 let mikrotikAutoRefreshTimer = null
-const dynamicEstados = ref([])
 
 /* ── Row selection ──────────────────────────────────── */
 const selectedClientId = ref(null)
@@ -139,7 +138,6 @@ onMounted(async () => {
 
   if (auth.isAdmin) {
     loadVendedoras()
-    await loadDynamicEstados()
   }
 
   await store.fetchClients(1)
@@ -166,16 +164,6 @@ onMounted(async () => {
     refreshVisibleMikrotikStatuses()
   }, 60000)
 })
-
-async function loadDynamicEstados() {
-  try {
-    const res = await api.get('/admin/client-estados')
-    dynamicEstados.value = Array.isArray(res.data?.data) ? res.data.data : []
-  } catch (e) {
-    console.error('Error loading client estados:', e)
-    dynamicEstados.value = []
-  }
-}
 
 onUnmounted(() => {
   if (mikrotikAutoRefreshTimer) {
@@ -233,16 +221,6 @@ async function loadVendedoras() {
   }
 }
 
-  async function loadEstados() {
-    try {
-      const res = await api.get('/admin/client-estados')
-      dynamicEstados.value = Array.isArray(res.data?.data) ? res.data.data : []
-    } catch (e) {
-      console.error('Error loading client estados:', e)
-      dynamicEstados.value = []
-    }
-  }
-
 function applyMonthToFilters(monthValue) {
   if (!monthValue || !/^\d{4}-\d{2}$/.test(monthValue)) return
   const [year, month] = monthValue.split('-').map(Number)
@@ -285,15 +263,6 @@ const ADMIN_STATUS_OPTIONS = [
   { value: 'baja', label: 'Baja' },
 ]
 
-const adminStatusOptions = computed(() => {
-  if (!dynamicEstados.value.length) return ADMIN_STATUS_OPTIONS
-  return dynamicEstados.value.map((estado) => ({
-    value: estado.id,
-    label: estado.nombre,
-    color: estado.color,
-  }))
-})
-
 /* ── Estado badge styles ────────────────────────────── */
 const estadoBadge = {
   pre_registro: 'bg-sky-50 text-sky-700 ring-sky-200',
@@ -322,30 +291,13 @@ function mikrotikState(client) {
 }
 
 function commercialState(client) {
-  const dynamicStateName = client?.cliente_estado?.nombre || client?.clienteEstado?.nombre
-  if (dynamicStateName) return dynamicStateName
-
   if (client.estado_comercial) return client.estado_comercial
   if (client.estado === 'baja') return 'baja'
   if (client.estado === 'suspendido') return 'suspendido'
   if (client.estado === 'pre_registro') return 'pre_registro'
   if (client.estado === 'en_proceso') return 'en_proceso'
   if (client.estado === 'finalizada' || client.estado === 'activo') return 'finalizada'
-  return client.estado || 'pre_registro'
-}
-
-function resolveReviewStatusValue(client) {
-  if (client?.cliente_estado_id) return client.cliente_estado_id
-
-  const dynamicState = client?.cliente_estado || client?.clienteEstado
-  if (dynamicState?.id) return dynamicState.id
-
-  if (client?.estado && dynamicEstados.value.length) {
-    const match = dynamicEstados.value.find((estado) => estado.nombre === client.estado)
-    if (match) return match.id
-  }
-
-  return client?.estado || commercialState(client)
+  return 'pre_registro'
 }
 
 /* ── Lifecycle ──────────────────────────────────────── */
@@ -399,7 +351,7 @@ async function openReviewModal(client) {
   }
 
   reviewClient.value = hydrated
-  reviewStatus.value = resolveReviewStatusValue(hydrated)
+  reviewStatus.value = hydrated.estado || commercialState(hydrated)
   reviewPage.value = 1
   reviewModalOpen.value = true
 }
@@ -438,11 +390,15 @@ async function saveClientStatus() {
 
     if (updatedClient) {
       reviewClient.value = { ...reviewClient.value, ...updatedClient }
-      reviewStatus.value = resolveReviewStatusValue(reviewClient.value)
+      reviewStatus.value = commercialState(reviewClient.value)
     }
 
     alert('Estado actualizado y guardado en BD correctamente.')
     closeReviewModal()
+
+    // Background refresh (no await) — updates counts/filters without blocking
+    // and only runs AFTER the modal is already closed.
+    store.fetchClients(store.pagination.current_page)
   } catch (e) {
     alert(e?.response?.data?.message ?? 'No se pudo guardar el estado del cliente en BD.')
   } finally {
@@ -1417,7 +1373,7 @@ async function copyToClipboard(text) {
             <h4 class="text-sm font-bold text-gray-900 mb-2 pb-1 border-b border-gray-200">CAMBIAR ESTADO</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
-                v-for="option in adminStatusOptions"
+                v-for="option in ADMIN_STATUS_OPTIONS"
                 :key="option.value"
                 type="button"
                 :disabled="savingStatus"
@@ -1429,7 +1385,7 @@ async function copyToClipboard(text) {
                     : 'border-gray-200 text-gray-700 hover:border-primary/50 hover:bg-primary/5',
                 ]"
               >
-                <span>{{ option.label }}</span>
+                {{ option.label }}
               </button>
             </div>
           </div>

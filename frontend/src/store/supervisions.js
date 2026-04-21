@@ -7,7 +7,6 @@ export const useSupervisionsStore = defineStore('supervisions', () => {
   const items        = ref([])
   const current      = ref(null)
   const supervisors  = ref([])
-  const estados      = ref([])
   const pagination   = ref({ current_page: 1, last_page: 1, total: 0, per_page: 15 })
   const loading      = ref(false)
 
@@ -47,22 +46,10 @@ export const useSupervisionsStore = defineStore('supervisions', () => {
     return data
   }
 
-  async function fetchEstados() {
-    const { data } = await supervisionsApi.getEstados()
-    estados.value = data
-    return data
-  }
-
   async function assignSupervision(payload) {
     const { data } = await supervisionsApi.assign(payload)
     items.value.unshift(data.data)
     pagination.value.total++
-    return data.data
-  }
-
-  async function setEstado(id, estadoId, comentario = null) {
-    const { data } = await supervisionsApi.setState(id, estadoId, comentario)
-    updateLocal(id, data.data)
     return data.data
   }
 
@@ -78,12 +65,13 @@ export const useSupervisionsStore = defineStore('supervisions', () => {
     return data.data
   }
 
-  async function uploadPhotos(id, files, tipo = 'general') {
-    await supervisionsApi.uploadPhotos(id, files, tipo)
+  async function uploadPhotos(id, files) {
+    const { data } = await supervisionsApi.uploadPhotos(id, files)
     // Reload current to get fresh photo list
     if (current.value?.id === id) {
       await fetchSupervision(id)
     }
+    return data.data
   }
 
   async function removePhoto(supervisionId, photoId) {
@@ -100,9 +88,9 @@ export const useSupervisionsStore = defineStore('supervisions', () => {
   }
 
   return {
-    items, current, supervisors, estados, pagination, loading,
-    fetchSupervisions, fetchSupervision, fetchSupervisors, fetchEstados,
-    assignSupervision, setEstado, startSupervision, completeSupervision,
+    items, current, supervisors, pagination, loading,
+    fetchSupervisions, fetchSupervision, fetchSupervisors,
+    assignSupervision, startSupervision, completeSupervision,
     uploadPhotos, removePhoto,
   }
 })

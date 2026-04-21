@@ -89,11 +89,11 @@ BOUNDARY="==backup_boundary_$$=="
   echo ""
   base64 "$FILEPATH"
   echo "--${BOUNDARY}--"
-} | msmtp --file=/home/gouser/.msmtprc --account=gmail "$MAIL_TO"
+} | msmtp --account=gmail "$MAIL_TO"
 
 # ── Limpiar backups viejos ───────────────────
 ls -t "${BACKUP_DIR}"/gosistema_backup_*.sql.gz 2>/dev/null \
   | tail -n +$((MAX_BACKUPS + 1)) \
   | xargs -r rm --
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup OK: ${FILENAME} (${SIZE}) → enviado a ${MAIL_TO}"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup OK: ${FILENAME} (${SIZE})"

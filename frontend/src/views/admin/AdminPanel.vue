@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { useAuthStore } from '@/store/auth'
 
@@ -29,30 +29,6 @@ const ROLES = [
   { value: 'supervisor', label: 'Supervisor',    color: 'bg-blue-100 text-blue-700',     icon: '👁️' },
 ]
 
-const ROLE_GROUPS = [
-  { value: 'admin', label: 'Administradores', description: 'Acceso total al sistema', accent: 'from-purple-50 to-white' },
-  { value: 'supervisor', label: 'Supervisores', description: 'Seguimiento y control operativo', accent: 'from-blue-50 to-white' },
-  { value: 'vendedora', label: 'Vendedoras', description: 'Gestión comercial y registros', accent: 'from-pink-50 to-white' },
-]
-
-const groupedUsers = computed(() => {
-  return ROLE_GROUPS.reduce((acc, group) => {
-    acc[group.value] = store.items.filter((user) => user.role === group.value)
-    return acc
-  }, {})
-})
-
-const visibleRoleGroups = computed(() => {
-  if (store.filters.role) {
-    return ROLE_GROUPS.filter((group) => group.value === store.filters.role)
-  }
-  return ROLE_GROUPS
-})
-
-function roleCount(role) {
-  return store.items.filter((user) => user.role === role).length
-}
-
 function roleInfo(role) {
   return ROLES.find(r => r.value === role) || ROLES[1]
 }
@@ -75,16 +51,6 @@ function onFilterRole(val) {
 function onFilterActive(val) {
   store.setFilter('active', val)
   store.fetchUsers(1)
-}
-
-async function jumpToRole(role) {
-  store.setFilter('role', role)
-  await store.fetchUsers(1)
-  await nextTick()
-  document.getElementById(`role-section-${role}`)?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  })
 }
 
 /* ── CRUD actions ─────────────────────────────────── */
@@ -275,155 +241,105 @@ onMounted(() => {
       </svg>
     </div>
 
-    <!-- Users grouped by role -->
-    <div v-else-if="store.items.length" class="space-y-5">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button class="card flex items-center gap-3 text-left transition-transform hover:-translate-y-0.5 hover:shadow-md" @click="jumpToRole('admin')">
-          <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-            <span class="text-lg">🛡️</span>
-          </div>
-          <div>
-            <p class="text-2xl font-bold text-gray-800">{{ roleCount('admin') }}</p>
-            <p class="text-xs text-gray-500">Administradores</p>
-          </div>
-        </button>
-        <button class="card flex items-center gap-3 text-left transition-transform hover:-translate-y-0.5 hover:shadow-md" @click="jumpToRole('supervisor')">
-          <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-            <span class="text-lg">👁️</span>
-          </div>
-          <div>
-            <p class="text-2xl font-bold text-gray-800">{{ roleCount('supervisor') }}</p>
-            <p class="text-xs text-gray-500">Supervisores</p>
-          </div>
-        </button>
-        <button class="card flex items-center gap-3 text-left transition-transform hover:-translate-y-0.5 hover:shadow-md" @click="jumpToRole('vendedora')">
-          <div class="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
-            <span class="text-lg">💼</span>
-          </div>
-          <div>
-            <p class="text-2xl font-bold text-gray-800">{{ roleCount('vendedora') }}</p>
-            <p class="text-xs text-gray-500">Vendedoras</p>
-          </div>
-        </button>
-      </div>
-
-      <section
-        v-for="group in visibleRoleGroups"
-        :key="group.value"
-        :id="`role-section-${group.value}`"
-        class="card overflow-hidden !p-0"
-      >
-        <div :class="['px-5 py-4 border-b border-gray-100 bg-gradient-to-r', group.accent]">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-xs uppercase tracking-wider text-gray-500">Vista por rol</p>
-              <h2 class="text-lg font-semibold text-gray-900">{{ group.label }}</h2>
-              <p class="text-sm text-gray-500">{{ group.description }}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-2xl font-bold text-gray-900">{{ groupedUsers[group.value]?.length ?? 0 }}</p>
-              <p class="text-xs text-gray-500">usuarios</p>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="groupedUsers[group.value]?.length" class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="bg-gray-50/80 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <th class="px-5 py-3">Usuario</th>
-                <th class="px-5 py-3">Rol</th>
-                <th class="px-5 py-3 hidden sm:table-cell">Clientes</th>
-                <th class="px-5 py-3">Estado</th>
-                <th class="px-5 py-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <tr
-                v-for="user in groupedUsers[group.value]"
-                :key="user.id"
-                class="hover:bg-gray-50/50 transition-colors"
-              >
-                <td class="px-5 py-3.5">
-                  <div class="flex items-center gap-3">
-                    <div
-                      :class="[
-                        'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white',
-                        user.role === 'admin' ? 'bg-purple-500' : user.role === 'supervisor' ? 'bg-blue-500' : 'bg-pink-500',
-                      ]"
-                    >
-                      {{ user.name.charAt(0).toUpperCase() }}
-                    </div>
-                    <div>
-                      <p class="font-medium text-gray-800">{{ user.name }}</p>
-                      <p class="text-xs text-gray-400">{{ user.email }}</p>
-                      <p v-if="user.dni" class="text-xs text-gray-400">DNI: {{ user.dni }}</p>
-                    </div>
-                  </div>
-                </td>
-
-                <td class="px-5 py-3.5">
-                  <span :class="['text-xs font-medium px-2.5 py-1 rounded-full', roleInfo(user.role).color]">
-                    {{ roleInfo(user.role).icon }} {{ roleInfo(user.role).label }}
-                  </span>
-                </td>
-
-                <td class="px-5 py-3.5 hidden sm:table-cell">
-                  <span class="text-gray-600">{{ user.clients_count ?? 0 }}</span>
-                </td>
-
-                <td class="px-5 py-3.5">
-                  <button
-                    @click="toggleActive(user)"
-                    :disabled="!auth.isAdmin || user.id === auth.user?.id"
+    <!-- Users table -->
+    <div v-else-if="store.items.length" class="card overflow-hidden !p-0">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50/80 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th class="px-5 py-3">Usuario</th>
+              <th class="px-5 py-3">Rol</th>
+              <th class="px-5 py-3 hidden sm:table-cell">Clientes</th>
+              <th class="px-5 py-3">Estado</th>
+              <th class="px-5 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr
+              v-for="user in store.items"
+              :key="user.id"
+              class="hover:bg-gray-50/50 transition-colors"
+            >
+              <!-- User info -->
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div
                     :class="[
-                      'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors',
-                      user.active
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
-                      !auth.isAdmin || user.id === auth.user?.id ? 'cursor-default opacity-60' : 'cursor-pointer',
+                      'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white',
+                      user.role === 'admin' ? 'bg-purple-500' : user.role === 'supervisor' ? 'bg-blue-500' : 'bg-pink-500',
                     ]"
                   >
-                    <span :class="['w-1.5 h-1.5 rounded-full', user.active ? 'bg-green-500' : 'bg-gray-400']" />
-                    {{ user.active ? 'Activo' : 'Inactivo' }}
-                  </button>
-                </td>
-
-                <td class="px-5 py-3.5 text-right">
-                  <div class="flex items-center justify-end gap-1">
-                    <button
-                      @click="openEdit(user)"
-                      class="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/5 transition-colors"
-                      title="Editar"
-                    >
-                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      v-if="auth.isAdmin && user.id !== auth.user?.id"
-                      @click="deleteUser(user)"
-                      class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      title="Eliminar usuario"
-                    >
-                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {{ user.name.charAt(0).toUpperCase() }}
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  <div>
+                    <p class="font-medium text-gray-800">{{ user.name }}</p>
+                    <p class="text-xs text-gray-400">{{ user.email }}</p>
+                    <p v-if="user.dni" class="text-xs text-gray-400">DNI: {{ user.dni }}</p>
+                  </div>
+                </div>
+              </td>
 
-        <div v-else class="px-5 py-10 text-center text-gray-500">
-          No hay usuarios en este rol con los filtros actuales.
-        </div>
-      </section>
+              <!-- Role badge -->
+              <td class="px-5 py-3.5">
+                <span :class="['text-xs font-medium px-2.5 py-1 rounded-full', roleInfo(user.role).color]">
+                  {{ roleInfo(user.role).icon }} {{ roleInfo(user.role).label }}
+                </span>
+              </td>
+
+              <!-- Clients count -->
+              <td class="px-5 py-3.5 hidden sm:table-cell">
+                <span class="text-gray-600">{{ user.clients_count ?? 0 }}</span>
+              </td>
+
+              <!-- Active status -->
+              <td class="px-5 py-3.5">
+                <button
+                  @click="toggleActive(user)"
+                  :disabled="!auth.isAdmin || user.id === auth.user?.id"
+                  :class="[
+                    'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors',
+                    user.active
+                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
+                    !auth.isAdmin || user.id === auth.user?.id ? 'cursor-default opacity-60' : 'cursor-pointer',
+                  ]"
+                >
+                  <span :class="['w-1.5 h-1.5 rounded-full', user.active ? 'bg-green-500' : 'bg-gray-400']" />
+                  {{ user.active ? 'Activo' : 'Inactivo' }}
+                </button>
+              </td>
+
+              <!-- Actions -->
+              <td class="px-5 py-3.5 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button
+                    @click="openEdit(user)"
+                    class="p-2 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/5 transition-colors"
+                    title="Editar"
+                  >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    v-if="auth.isAdmin && user.id !== auth.user?.id"
+                    @click="deleteUser(user)"
+                    class="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title="Eliminar usuario"
+                  >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- Pagination -->
-      <div v-if="store.pagination.last_page > 1" class="flex items-center justify-between px-5 py-3 border border-gray-100 rounded-2xl bg-white shadow-sm">
+      <div v-if="store.pagination.last_page > 1" class="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/40">
         <p class="text-xs text-gray-500">
           {{ store.pagination.total }} usuario{{ store.pagination.total !== 1 ? 's' : '' }}
         </p>
@@ -458,6 +374,37 @@ onMounted(() => {
       <button @click="openCreate" class="text-primary text-sm font-medium mt-2 hover:underline">
         Crear primer usuario
       </button>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+      <div class="card flex items-center gap-3">
+        <div class="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
+          <span class="text-lg">💼</span>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-800">{{ store.items.filter(u => u.role === 'vendedora').length }}</p>
+          <p class="text-xs text-gray-500">Vendedoras</p>
+        </div>
+      </div>
+      <div class="card flex items-center gap-3">
+        <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+          <span class="text-lg">👁️</span>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-800">{{ store.items.filter(u => u.role === 'supervisor').length }}</p>
+          <p class="text-xs text-gray-500">Supervisores</p>
+        </div>
+      </div>
+      <div class="card flex items-center gap-3">
+        <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+          <span class="text-lg">🛡️</span>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-gray-800">{{ store.items.filter(u => u.role === 'admin').length }}</p>
+          <p class="text-xs text-gray-500">Administradores</p>
+        </div>
+      </div>
     </div>
 
     <!-- ═══════════ Modal: Create/Edit User ═══════════ -->

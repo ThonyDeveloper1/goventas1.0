@@ -63,22 +63,6 @@ export default {
   ipHistory(clientId, page = 1) {
     return api.get(`/clients/${clientId}/ip-history`, { params: { page } })
   },
-
-  getEstados() {
-    return api.get('/admin/client-estados')
-  },
-
-  createEstado(data) {
-    return api.post('/admin/client-estados', data)
-  },
-
-  updateEstado(id, data) {
-    return api.put(`/admin/client-estados/${id}`, data)
-  },
-
-  deleteEstado(id) {
-    return api.delete(`/admin/client-estados/${id}`)
-  },
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */

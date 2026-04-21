@@ -35,7 +35,7 @@ class UpdateClientRequest extends FormRequest
             'plan_id'      => ['nullable', 'integer', 'exists:plans,id'],
             'installacion_fecha' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
             'installacion_hora_inicio' => ['nullable', 'date_format:H:i'],
-            'installacion_duracion' => ['nullable', 'integer', 'in:1'],
+            'installacion_duracion' => ['nullable', 'integer', 'in:1,2'],
             'fotos'        => ['nullable', 'array', 'max:5'],
             'fotos.*'      => ['image', 'mimes:jpeg,jpg,png,webp', 'max:4096'],
             'fotos_fachada' => ['nullable', 'array', 'max:5'],

@@ -15,21 +15,7 @@ class Supervision extends Model
         'installation_id',
         'supervisor_id',
         'estado',
-        'estado_id',
         'comentario',
-        'fachada_verificada',
-        'conexiones_verificadas',
-        'ubicacion_confirmada',
-        'servicio_verificado',
-        'nivel_senal',
-        'notas_supervisor',
-    ];
-
-    protected $casts = [
-        'fachada_verificada'    => 'boolean',
-        'conexiones_verificadas' => 'boolean',
-        'ubicacion_confirmada'  => 'boolean',
-        'servicio_verificado'   => 'boolean',
     ];
 
     /* ─── Relationships ──────────────────────────────────── */
@@ -49,11 +35,6 @@ class Supervision extends Model
         return $this->hasMany(SupervisionPhoto::class);
     }
 
-    public function estadoSupervision(): BelongsTo
-    {
-        return $this->belongsTo(SupervisionEstado::class, 'estado_id');
-    }
-
     /* ─── Scopes ─────────────────────────────────────────── */
 
     public function scopeForUser($query, User $user)
@@ -64,11 +45,8 @@ class Supervision extends Model
         return $query;
     }
 
-    public function scopeEstado($query, string|int $estado)
+    public function scopeEstado($query, string $estado)
     {
-        if (is_numeric($estado)) {
-            return $query->where('estado_id', $estado);
-        }
         return $query->where('estado', $estado);
     }
 

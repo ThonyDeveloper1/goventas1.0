@@ -13,9 +13,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health:   '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Trust Cloudflare as reverse proxy
-        $middleware->trustProxies(at: '*');
-
         // Register role middleware alias
         $middleware->alias([
             'role' => RoleMiddleware::class,

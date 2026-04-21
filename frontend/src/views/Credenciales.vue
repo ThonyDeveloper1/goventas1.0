@@ -74,7 +74,7 @@ async function updatePassword() {
 <template>
   <div class="max-w-4xl mx-auto space-y-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">UpdateHub</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Credenciales</h1>
       <p class="text-sm text-gray-500 mt-1">Actualiza tu DNI y tu contraseña de acceso.</p>
     </div>
 

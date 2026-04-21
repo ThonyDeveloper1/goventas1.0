@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\AssignSupervisionRequest;
 use App\Models\InternalNotification;
-use App\Models\Installation;
 use App\Models\Supervision;
-use App\Models\SupervisionEstado;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +27,6 @@ class SupervisionController extends Controller
                 'installation.vendedora:id,name',
                 'supervisor:id,name',
                 'photos',
-                'estadoSupervision',
             ])
             ->forUser($user);
 
@@ -65,12 +62,11 @@ class SupervisionController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $supervision = Supervision::with([
-            'installation.client:id,nombres,apellidos,dni,telefono_1,direccion,distrito,latitud,longitud,ip_address,service_status',
+            'installation.client:id,nombres,apellidos,dni,telefono_1,direccion,distrito,latitud,longitud',
             'installation.client.photos',
             'installation.vendedora:id,name',
             'supervisor:id,name',
             'photos',
-            'estadoSupervision',
         ])->findOrFail($id);
 
         $this->authorizeAccess($request->user(), $supervision);
@@ -98,16 +94,10 @@ class SupervisionController extends Controller
         }
 
         $supervision = DB::transaction(function () use ($request, $supervisor) {
-            $primerEstado = SupervisionEstado::where('activo', true)
-                ->orderBy('orden')
-                ->orderBy('id')
-                ->first();
-
             $supervision = Supervision::create([
                 'installation_id' => $request->installation_id,
                 'supervisor_id'   => $supervisor->id,
                 'estado'          => 'pendiente',
-                'estado_id'       => $primerEstado?->id,
             ]);
 
             // Notificar al supervisor
@@ -130,7 +120,6 @@ class SupervisionController extends Controller
             'installation.client:id,nombres,apellidos,dni,distrito',
             'supervisor:id,name',
             'photos',
-            'estadoSupervision',
         ]);
 
         return response()->json([
@@ -141,119 +130,7 @@ class SupervisionController extends Controller
     }
 
     /* ─────────────────────────────────────────────────────────
-     |  PATCH /supervisions/{id}
-     |  Admin or assigned supervisor — update checklist fields
-     ────────────────────────────────────────────────────────── */
-    public function update(Request $request, int $id): JsonResponse
-    {
-        $supervision = Supervision::findOrFail($id);
-        $this->authorizeAssigned($request->user(), $supervision);
-
-        $data = $request->validate([
-            'comentario'             => ['nullable', 'string', 'max:1000'],
-            'notas_supervisor'       => ['nullable', 'string', 'max:2000'],
-            'fachada_verificada'     => ['nullable', 'boolean'],
-            'conexiones_verificadas' => ['nullable', 'boolean'],
-            'ubicacion_confirmada'   => ['nullable', 'boolean'],
-            'servicio_verificado'    => ['nullable', 'boolean'],
-            'nivel_senal'            => ['nullable', 'string', 'max:50'],
-        ]);
-
-        $supervision->update(array_filter($data, fn ($v) => $v !== null || is_bool($v)));
-
-        $supervision->load('estadoSupervision');
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Supervisión actualizada.',
-            'data'    => $supervision,
-        ]);
-    }
-
-    /* ─────────────────────────────────────────────────────────
-     |  POST /supervisions/{id}/estado
-     |  Admin or assigned supervisor — set any estado
-     ────────────────────────────────────────────────────────── */
-    public function setState(Request $request, int $id): JsonResponse
-    {
-        $supervision = Supervision::findOrFail($id);
-        $this->authorizeAssigned($request->user(), $supervision);
-
-        $request->validate([
-            'estado_id'  => ['required', 'integer', 'exists:supervision_estados,id'],
-            'comentario' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $estado = SupervisionEstado::findOrFail($request->estado_id);
-
-        $supervision->update([
-            'estado_id'  => $estado->id,
-            'comentario' => $request->input('comentario', $supervision->comentario),
-        ]);
-
-        $supervision->load('estadoSupervision');
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Estado actualizado: ' . $estado->nombre . '.',
-            'data'    => $supervision,
-        ]);
-    }
-
-    /* ─────────────────────────────────────────────────────────
-     |  GET /supervisions/tickets
-     |  Admin + Supervisor — all installations with supervision data
-     ────────────────────────────────────────────────────────── */
-    public function tickets(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        $mes      = $request->input('mes');       // e.g. '2026-04'
-        $estadoId = $request->input('estado_id'); // filter by estado
-        $history  = $request->boolean('history'); // include Aprobado
-
-        $query = Installation::query()
-            ->with([
-                'client:id,nombres,apellidos,dni,telefono_1,distrito,ip_address,service_status',
-                'vendedora:id,name',
-                'supervision.estadoSupervision',
-                'supervision.supervisor:id,name',
-            ])
-            ->select('installations.*');
-
-        // Supervisor role: only installations they are assigned to supervise
-        if ($user->isSupervisor()) {
-            $query->whereHas('supervision', fn ($q) => $q->where('supervisor_id', $user->id));
-        }
-
-        // Filter by month of installation date
-        if ($mes && preg_match('/^\d{4}-\d{2}$/', $mes)) {
-            $query->whereRaw("to_char(installations.fecha, 'YYYY-MM') = ?", [$mes]);
-        }
-
-        // Exclude Aprobado by default (unless history mode)
-        if (! $history) {
-            $aprobadoId = SupervisionEstado::where('nombre', 'Aprobado')->value('id');
-            if ($aprobadoId) {
-                $query->where(function ($q) use ($aprobadoId) {
-                    $q->doesntHave('supervision')
-                      ->orWhereHas('supervision', fn ($s) => $s->where('estado_id', '!=', $aprobadoId));
-                });
-            }
-        }
-
-        // Filter by estado_id
-        if ($estadoId) {
-            $query->whereHas('supervision', fn ($q) => $q->where('estado_id', $estadoId));
-        }
-
-        $items = $query->orderBy('installations.fecha', 'desc')->paginate(50);
-
-        return response()->json($items);
-    }
-
-    /* ─────────────────────────────────────────────────────────
-     |  POST /supervisions/{id}/start   (kept for compat)
+     |  POST /supervisions/{id}/start
      |  Supervisor assigned only
      ────────────────────────────────────────────────────────── */
     public function start(Request $request, int $id): JsonResponse
@@ -261,15 +138,13 @@ class SupervisionController extends Controller
         $supervision = Supervision::findOrFail($id);
         $this->authorizeAssigned($request->user(), $supervision);
 
-        $enProceso = SupervisionEstado::where('nombre', 'En Proceso')->first()
-            ?? SupervisionEstado::orderBy('orden')->skip(1)->first();
+        if ($supervision->estado !== 'pendiente') {
+            throw ValidationException::withMessages([
+                'estado' => ['Solo se puede iniciar una supervisión en estado pendiente.'],
+            ]);
+        }
 
-        $supervision->update([
-            'estado'    => 'en_proceso',
-            'estado_id' => $enProceso?->id ?? $supervision->estado_id,
-        ]);
-
-        $supervision->load('estadoSupervision');
+        $supervision->update(['estado' => 'en_proceso']);
 
         return response()->json([
             'success' => true,
@@ -304,12 +179,8 @@ class SupervisionController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $supervision) {
-            $finalizado = SupervisionEstado::where('nombre', 'Finalizado')->first()
-                ?? SupervisionEstado::orderBy('orden')->skip(2)->first();
-
             $supervision->update([
                 'estado'     => 'completado',
-                'estado_id'  => $finalizado?->id ?? $supervision->estado_id,
                 'comentario' => $request->input('comentario', $supervision->comentario),
             ]);
 
@@ -334,7 +205,7 @@ class SupervisionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Supervisión completada correctamente.',
-            'data'    => $supervision->fresh(['photos', 'supervisor:id,name', 'estadoSupervision']),
+            'data'    => $supervision->fresh(['photos', 'supervisor:id,name']),
         ]);
     }
 
@@ -347,21 +218,24 @@ class SupervisionController extends Controller
         $supervision = Supervision::findOrFail($id);
         $this->authorizeAssigned($request->user(), $supervision);
 
+        if ($supervision->estado === 'completado') {
+            throw ValidationException::withMessages([
+                'estado' => ['No se pueden agregar fotos a una supervisión completada.'],
+            ]);
+        }
+
         $request->validate([
             'fotos'   => ['required', 'array', 'min:1', 'max:10'],
             'fotos.*' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:4096'],
-            'tipo'    => ['nullable', 'string', 'in:general,fachada,conexiones'],
         ], [
             'fotos.required' => 'Seleccione al menos una foto.',
             'fotos.*.max'    => 'Cada foto no debe superar 4 MB.',
         ]);
 
-        $tipo = $request->input('tipo', 'general');
-
         $photos = [];
         foreach ($request->file('fotos') as $file) {
             $path = $file->store("supervisions/{$id}/photos", 'public');
-            $photos[] = $supervision->photos()->create(['photo_path' => $path, 'tipo' => $tipo]);
+            $photos[] = $supervision->photos()->create(['photo_path' => $path]);
         }
 
         // Append URL accessor
@@ -383,6 +257,12 @@ class SupervisionController extends Controller
     {
         $supervision = Supervision::findOrFail($id);
         $this->authorizeAssigned($request->user(), $supervision);
+
+        if ($supervision->estado === 'completado') {
+            throw ValidationException::withMessages([
+                'estado' => ['No se pueden eliminar fotos de una supervisión completada.'],
+            ]);
+        }
 
         $photo = $supervision->photos()->findOrFail($photoId);
         Storage::disk('public')->delete($photo->photo_path);
