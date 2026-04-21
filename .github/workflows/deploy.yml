@@ -1,0 +1,54 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+
+      # 1 — Descargar el repo completo
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2 — Merge dev → main automáticamente
+      - name: Merge dev into main
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git checkout main
+          git merge dev --no-ff -m "Auto-merge: dev → main [deploy]"
+          git push origin main
+
+      # 3 — Instalar cloudflared en el runner
+      - name: Install cloudflared
+        run: |
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+
+      # 4 — Configurar llave SSH
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      # 5 — Tunel TCP via Cloudflare + deploy
+      - name: Deploy via Cloudflare Tunnel SSH
+        run: |
+          # Abrir túnel TCP local: localhost:2222 → ssh.gofibra.pe:22
+          cloudflared access tcp --hostname ssh.gofibra.pe --url 127.0.0.1:2222 &
+          sleep 4
+
+          ssh -p 2222 \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            gouser@127.0.0.1 \
+            "cd /var/www/gosistema && git pull origin main && bash deploy_ssh.sh"
+
